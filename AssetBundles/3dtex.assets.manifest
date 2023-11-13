@@ -1,0 +1,16 @@
+ManifestFileVersion: 0
+CRC: 4228499438
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: c8ecc063664d947b1b2d0649d6421c88
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 2ae100e13f828ae965689458bedd7cc6
+HashAppended: 0
+ClassTypes:
+- Class: 117
+  Script: {instanceID: 0}
+Assets:
+- Assets/rayMarchingTest/3DNoiseA_RGBA32.asset
+Dependencies: []

@@ -1,0 +1,24 @@
+ManifestFileVersion: 0
+CRC: 3484367310
+AssetBundleManifest:
+  AssetBundleInfos:
+    Info_0:
+      Name: 3to2_shaders.assets
+      Dependencies: {}
+    Info_1:
+      Name: hbk.assets
+      Dependencies:
+        Dependency_0: 3to2_shaders.assets
+    Info_2:
+      Name: hbkcam.assets
+      Dependencies: {}
+    Info_3:
+      Name: mafuti.assets
+      Dependencies:
+        Dependency_0: 3to2_shaders.assets
+    Info_4:
+      Name: collidermeshes.assets
+      Dependencies: {}
+    Info_5:
+      Name: volumcloud.assets
+      Dependencies: {}

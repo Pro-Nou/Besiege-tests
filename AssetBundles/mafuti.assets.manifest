@@ -1,0 +1,42 @@
+ManifestFileVersion: 0
+CRC: 411258696
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: ebdb95bcf93b27853807dca670c3f79b
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: a6e9e8f412a02cd5dfe2293ccf54ac5d
+HashAppended: 0
+ClassTypes:
+- Class: 1
+  Script: {instanceID: 0}
+- Class: 4
+  Script: {instanceID: 0}
+- Class: 21
+  Script: {instanceID: 0}
+- Class: 28
+  Script: {instanceID: 0}
+- Class: 43
+  Script: {instanceID: 0}
+- Class: 48
+  Script: {instanceID: 0}
+- Class: 74
+  Script: {instanceID: 0}
+- Class: 83
+  Script: {instanceID: 0}
+- Class: 90
+  Script: {instanceID: 0}
+- Class: 91
+  Script: {instanceID: 0}
+- Class: 95
+  Script: {instanceID: 0}
+- Class: 137
+  Script: {instanceID: 0}
+- Class: 152
+  Script: {instanceID: 0}
+Assets:
+- "Assets/Pix_jiegang/\u9A6C\u592B\u8482.prefab"
+- Assets/Pix_jiegang/mafuti.mp4
+Dependencies:
+- AssetBundles/3to2_shaders.assets

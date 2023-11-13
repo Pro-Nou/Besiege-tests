@@ -1,0 +1,24 @@
+ManifestFileVersion: 0
+CRC: 2213750253
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: 2409677f8a84218f95893ea3acd86f7f
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: 99133d13a78bb8f26f8a82909ba81ede
+HashAppended: 0
+ClassTypes:
+- Class: 1
+  Script: {instanceID: 0}
+- Class: 4
+  Script: {instanceID: 0}
+- Class: 74
+  Script: {instanceID: 0}
+- Class: 91
+  Script: {instanceID: 0}
+- Class: 95
+  Script: {instanceID: 0}
+Assets:
+- Assets/HBK2/HKB_CAM.prefab
+Dependencies: []

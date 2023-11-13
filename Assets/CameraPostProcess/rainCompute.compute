@@ -1,0 +1,28 @@
+﻿// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel InitParticle
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+struct ParticleData {
+	float3 pos;
+};
+RWStructuredBuffer<ParticleData> ParticleBuffer;
+
+float kusaiRand(float valueIn)
+{
+	return frac(((valueIn * 11451.419198) + 10114.514191) % 9.810);
+}
+
+[numthreads(8, 8, 1)]
+void InitParticle(uint3 gid : SV_GroupID, uint index : SV_GroupIndex)
+{
+	//SV_GroupID = (8,1,1)
+	//SV_GroupIndex = 0~63
+	uint pindex = gid.x * 64 + index;
+	float3 posInit = float3(0, 0, 0);
+	posInit.x = index % 8;
+	posInit.y = kusaiRand(pindex * 1.919810) * 8;
+	posInit.z = kusaiRand(pindex * 1.14514) + ((index - posInit.x) / 8);
+	posInit.x += kusaiRand(pindex);
+	ParticleBuffer[pindex].pos = posInit;
+}
