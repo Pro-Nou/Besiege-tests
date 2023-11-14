@@ -146,15 +146,15 @@
 				float lod = blurScaleIn / 10;
 				float2 blurDir1 = float2(abs(texelSizeIn.x), 0) * blurScaleIn;
 				float2 blurDir2 = float2(0, abs(texelSizeIn.y)) * blurScaleIn;
-				float4 colOut = tex2Dlod(texIn, fixed4(scrPosIn, 0, lod)) * 4;
-				colOut += tex2Dlod(texIn, fixed4(scrPosIn + blurDir1, 0, lod)) * 2;
-				colOut += tex2Dlod(texIn, fixed4(scrPosIn + blurDir2, 0, lod)) * 2;
-				colOut += tex2Dlod(texIn, fixed4(scrPosIn - blurDir1, 0, lod)) * 2;
-				colOut += tex2Dlod(texIn, fixed4(scrPosIn - blurDir2, 0, lod)) * 2;
-				colOut += tex2Dlod(texIn, fixed4(scrPosIn + blurDir1 + blurDir2, 0, lod));
-				colOut += tex2Dlod(texIn, fixed4(scrPosIn + blurDir1 - blurDir2, 0, lod));
-				colOut += tex2Dlod(texIn, fixed4(scrPosIn - blurDir1 + blurDir2, 0, lod));
-				colOut += tex2Dlod(texIn, fixed4(scrPosIn - blurDir1 - blurDir2, 0, lod));
+				float4 colOut = tex2Dlod(texIn, float4(scrPosIn, 0, lod)) * 4;
+				colOut += tex2Dlod(texIn, float4(scrPosIn + blurDir1, 0, lod)) * 2;
+				colOut += tex2Dlod(texIn, float4(scrPosIn + blurDir2, 0, lod)) * 2;
+				colOut += tex2Dlod(texIn, float4(scrPosIn - blurDir1, 0, lod)) * 2;
+				colOut += tex2Dlod(texIn, float4(scrPosIn - blurDir2, 0, lod)) * 2;
+				colOut += tex2Dlod(texIn, float4(scrPosIn + blurDir1 + blurDir2, 0, lod));
+				colOut += tex2Dlod(texIn, float4(scrPosIn + blurDir1 - blurDir2, 0, lod));
+				colOut += tex2Dlod(texIn, float4(scrPosIn - blurDir1 + blurDir2, 0, lod));
+				colOut += tex2Dlod(texIn, float4(scrPosIn - blurDir1 - blurDir2, 0, lod));
 				return colOut / 16;
 			}
 			float4 frag(v2f i) : SV_Target
@@ -459,8 +459,9 @@
 				Voronoi_float(i.uv.xy, _Time.y, 10, noise, cell);
 				Voronoi_float(i.uv.xy, 16 + _Time.x * 2, 10, noise0, cell0);
 				float largeStep = smoothstep(0, noise, 0.5);
-				float smallStep = step(noise0, 0.2);
-				return fixed4(smallStep * largeStep * cell - 0.3, 0, 0, 1);
+				float smallStep = smoothstep(0, noise0, 0.08);
+				fixed final = smallStep * largeStep * cell - 0.3;
+				return fixed4(final, 0, 0, 1);
 				// return fixed4(step(noise, 0.03), 0, 0, 1);
 				// return fixed4(noise, 0, 0, 0);
 			}

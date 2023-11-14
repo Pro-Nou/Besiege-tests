@@ -13,7 +13,6 @@
         // _HeightBump("Height Bump", Range(0.001, 1)) = 0.2
         [NoScaleOffset]_AttachMap ("Attach Map", 2D) = "black" {}
         _AttachBump("Attach Bump", Range(0.001, 1)) = 0.2
-        _rainMap ("Rain Map", 2D) = "black" {}
         _waveSpeed("Wave Speed", Vector) = (0, 0, 0, 0)
         _waveMask ("Wave Mask", 2D) = "white" {}
         _waveCull ("Wave Cull", range(0, 1)) = 0
@@ -52,9 +51,9 @@
         float4 _HeightMap_TexelSize;
         sampler2D _AttachMap;
         float4 _AttachMap_TexelSize;
-        sampler2D _rainMap;
-        float4 _rainMap_ST;
-        float4 _rainMap_TexelSize;
+        sampler2D _RainMap;
+        float4 _RainMap_ST;
+        float4 _RainMap_TexelSize;
         sampler2D _BubbleMap;
         float4 _BubbleMap_ST;
         sampler2D _waveMask;
@@ -114,15 +113,15 @@
             float lod = blurScaleIn / 10;
             float2 blurDir1 = float2(abs(texelSizeIn.x), 0) * blurScaleIn;
             float2 blurDir2 = float2(0, abs(texelSizeIn.y)) * blurScaleIn;
-          	fixed4 colOut = tex2Dlod(texIn, fixed4(scrPosIn, 0, lod)) * 4;
-            colOut += tex2Dlod(texIn, fixed4(scrPosIn + blurDir1, 0, lod)) * 2;
-            colOut += tex2Dlod(texIn, fixed4(scrPosIn + blurDir2, 0, lod)) * 2;
-            colOut += tex2Dlod(texIn, fixed4(scrPosIn - blurDir1, 0, lod)) * 2;
-            colOut += tex2Dlod(texIn, fixed4(scrPosIn - blurDir2, 0, lod)) * 2;
-            colOut += tex2Dlod(texIn, fixed4(scrPosIn + blurDir1 + blurDir2, 0, lod));
-            colOut += tex2Dlod(texIn, fixed4(scrPosIn + blurDir1 - blurDir2, 0, lod));
-            colOut += tex2Dlod(texIn, fixed4(scrPosIn - blurDir1 + blurDir2, 0, lod));
-            colOut += tex2Dlod(texIn, fixed4(scrPosIn - blurDir1 - blurDir2, 0, lod));
+          	float4 colOut = tex2Dlod(texIn, float4(scrPosIn, 0, lod)) * 4;
+            colOut += tex2Dlod(texIn, float4(scrPosIn + blurDir1, 0, lod)) * 2;
+            colOut += tex2Dlod(texIn, float4(scrPosIn + blurDir2, 0, lod)) * 2;
+            colOut += tex2Dlod(texIn, float4(scrPosIn - blurDir1, 0, lod)) * 2;
+            colOut += tex2Dlod(texIn, float4(scrPosIn - blurDir2, 0, lod)) * 2;
+            colOut += tex2Dlod(texIn, float4(scrPosIn + blurDir1 + blurDir2, 0, lod));
+            colOut += tex2Dlod(texIn, float4(scrPosIn + blurDir1 - blurDir2, 0, lod));
+            colOut += tex2Dlod(texIn, float4(scrPosIn - blurDir1 + blurDir2, 0, lod));
+            colOut += tex2Dlod(texIn, float4(scrPosIn - blurDir1 - blurDir2, 0, lod));
             return colOut / 16;
         }
         fixed4 texCubeBlur(samplerCUBE texIn, float3 reflDirIn, float2 texelSizeIn, float blurIn)
@@ -130,25 +129,25 @@
             float lod = blurIn / 10;
             fixed3 reflDir1 = fixed3(reflDirIn.z, 0, -reflDirIn.x);
             fixed3 reflDir2 = cross(reflDirIn, reflDir1);
-            fixed4 colOut = texCUBElod(texIn, fixed4(reflDirIn,lod)) * 4;
-            colOut += texCUBElod(texIn, fixed4(reflDirIn + blurIn * texelSizeIn.x * reflDir1,lod)) * 2;
-            colOut += texCUBElod(texIn, fixed4(reflDirIn - blurIn * texelSizeIn.x * reflDir1,lod)) * 2;
-            colOut += texCUBElod(texIn, fixed4(reflDirIn + blurIn * texelSizeIn.x * reflDir2,lod)) * 2;
-            colOut += texCUBElod(texIn, fixed4(reflDirIn - blurIn * texelSizeIn.x * reflDir2,lod)) * 2;
-            colOut += texCUBElod(texIn, fixed4(reflDirIn + blurIn * texelSizeIn.x * (reflDir1 + reflDir2),lod));
-            colOut += texCUBElod(texIn, fixed4(reflDirIn - blurIn * texelSizeIn.x * (reflDir1 + reflDir2),lod));
-            colOut += texCUBElod(texIn, fixed4(reflDirIn + blurIn * texelSizeIn.x * (reflDir1 - reflDir2),lod));
-            colOut += texCUBElod(texIn, fixed4(reflDirIn - blurIn * texelSizeIn.x * (reflDir1 - reflDir2),lod));
+            float4 colOut = texCUBElod(texIn, float4(reflDirIn,lod)) * 4;
+            colOut += texCUBElod(texIn, float4(reflDirIn + blurIn * texelSizeIn.x * reflDir1,lod)) * 2;
+            colOut += texCUBElod(texIn, float4(reflDirIn - blurIn * texelSizeIn.x * reflDir1,lod)) * 2;
+            colOut += texCUBElod(texIn, float4(reflDirIn + blurIn * texelSizeIn.x * reflDir2,lod)) * 2;
+            colOut += texCUBElod(texIn, float4(reflDirIn - blurIn * texelSizeIn.x * reflDir2,lod)) * 2;
+            colOut += texCUBElod(texIn, float4(reflDirIn + blurIn * texelSizeIn.x * (reflDir1 + reflDir2),lod));
+            colOut += texCUBElod(texIn, float4(reflDirIn - blurIn * texelSizeIn.x * (reflDir1 + reflDir2),lod));
+            colOut += texCUBElod(texIn, float4(reflDirIn + blurIn * texelSizeIn.x * (reflDir1 - reflDir2),lod));
+            colOut += texCUBElod(texIn, float4(reflDirIn - blurIn * texelSizeIn.x * (reflDir1 - reflDir2),lod));
             return colOut / 16;
         }
     	fixed4 tex2DBlur(sampler2D texIn, float2 scrPosIn, float2 texelSizeIn)
         {
             float2 blurDir1 = float2(abs(texelSizeIn.x), 0);
             float2 blurDir2 = float2(0, abs(texelSizeIn.y));
-            fixed4 colOut = tex2Dlod(texIn, fixed4(scrPosIn + blurDir1, 0, 0));
-            colOut += tex2Dlod(texIn, fixed4(scrPosIn + blurDir2, 0, 0));
-            colOut += tex2Dlod(texIn, fixed4(scrPosIn - blurDir1, 0, 0));
-            colOut += tex2Dlod(texIn, fixed4(scrPosIn - blurDir2, 0, 0));
+            float4 colOut = tex2Dlod(texIn, float4(scrPosIn + blurDir1, 0, 0));
+            colOut += tex2Dlod(texIn, float4(scrPosIn + blurDir2, 0, 0));
+            colOut += tex2Dlod(texIn, float4(scrPosIn - blurDir1, 0, 0));
+            colOut += tex2Dlod(texIn, float4(scrPosIn - blurDir2, 0, 0));
             return colOut / 4;
         }
         float4 crossGraySample(sampler2D texIn, float2 texelSizeIn, float2 samplerPos)
@@ -161,11 +160,11 @@
             float h2_v = tex2Dlod(texIn, float4(samplerPos.xy + deltaV, 0, 0)).r;
             return float4(h1_u, h2_u, h1_v, h2_v);
         }
-        float3 grayToNormal(sampler2D texIn, float2 texelSizeIn, float2 samplerPos, float xzScale, float yScale)
+        float3 grayToNormal(sampler2D texIn, float2 texelSizeIn, float2 samplerPos)
         {
             float4 crossSampler = crossGraySample(texIn, texelSizeIn, samplerPos);
-            float3 tangent_u = float3(texelSizeIn.x * xzScale, (crossSampler.y - crossSampler.x) * yScale, 0);
-            float3 tangent_v = float3(0, (crossSampler.w - crossSampler.z) * yScale, texelSizeIn.y * xzScale);
+            float3 tangent_u = float3(1, (crossSampler.y - crossSampler.x), 0);
+            float3 tangent_v = float3(0, (crossSampler.w - crossSampler.z), 1);
             float3 normalOut = cross(normalize(tangent_u), normalize(tangent_v));
             normalOut.y *= -1;
             return normalize(normalOut);
@@ -296,6 +295,7 @@
         }
         Pass
         {	
+            Tags {"IGNOREPROJECTOR"="true" "SHADOWSUPPORT"="true"}
             CGPROGRAM
             #pragma vertex vert
             #pragma hull HullS
@@ -339,7 +339,7 @@
                 output.uv.zw = TRANSFORM_TEX(uv.xy, _BumpMap) + waveOffset;
                 output.uv1.xy = TRANSFORM_TEX(uv.xy, _BubbleMap);
                 output.uv1.zw = TRANSFORM_TEX(uv.xy, _waveMask) + waveMaskOffset;
-                output.uv2.xy = TRANSFORM_TEX(uv.xy, _rainMap);
+                output.uv2.xy = float2(0,0);
                 output.uv2.zw = uv.zw;
 
                 output.shouldInteract = uv.z <= (1 - _interactFadeUV) && uv.z >= _interactFadeUV && uv.w <= (1 - _interactFadeUV) && uv.w >= _interactFadeUV;
@@ -390,7 +390,8 @@
 
                 float waveMask = max(0, tex2Dlod(_waveMask, float4(i.uv1.zw, 0, 0)).r - _waveCull);
                 waveMask = smoothstep(0, 1 - _waveCull, waveMask) * _HeightScale;
-                float3 normalOS = grayToNormal(_HeightMap, _HeightMap_TexelSize.xy, i.uv.xy, _HeightBump, waveMask);
+                float3 normalOS = grayToNormal(_HeightMap, _HeightMap_TexelSize.xy, i.uv.xy);
+                normalOS = lerp(fixed3(0,1,0), normalOS, waveMask);
                 float bubbleAlpha = tex2Dlod(_HeightMap, float4(i.uv.xy, 0, 0)).r * waveMask;
                 bool isUnderWater = _WorldSpaceCameraPos.y < unity_ObjectToWorld[1].w;
                 
@@ -407,9 +408,9 @@
                     float2 rainUVMod = float2(floor(rainUV.x % 4), floor(rainUV.y % 4));
                     rainUV = ((rainUV.xy - rainUVMod) + (float2(rainColum, 1 - rainRow))) / 4;
 
-                    fixed3 normalRain = grayToNormal(_rainMap, _rainMap_TexelSize.xy, rainUV, _HeightBump, 1);
+                    fixed3 normalRain = grayToNormal(_RainMap, _RainMap_TexelSize.xy, rainUV);
                     // float3 normalRain = float3(tex2Dlod(_rainMap, float4(rainUV, 0, 0)).xy * 2 - 1, 1);
-                    float3 normalAttach = grayToNormal(_AttachMap, _AttachMap_TexelSize.xy, i.uv2.zw, 1 / _AttachBump, 1);
+                    float3 normalAttach = grayToNormal(_AttachMap, _AttachMap_TexelSize.xy, i.uv2.zw);
                     normalOS.xz += (bubbleAlpha < 0.2) * normalRain.xz * _rainVisibility;
                 }
                 float3 worldNormal = UnityObjectToWorldNormal(normalize(normalOS));
@@ -420,7 +421,7 @@
                 float4 TtoW1 = float4(worldTangent.y, worldBinormal.y, worldNormal.y, i.worldPos.y);
                 float4 TtoW2 = float4(worldTangent.z, worldBinormal.z, worldNormal.z, i.worldPos.z);
 
-                fixed4 packedNormal = tex2Dlod(_BumpMap, fixed4(i.uv.zw,0,0));
+                fixed4 packedNormal = tex2Dlod(_BumpMap, float4(i.uv.zw,0,0));
                 fixed3 bump = fixed3(0,0,1);
                 bump.xy = (packedNormal.xy * 2 - 1 ) * _BumpScale;
                 bump.z = sqrt(1.0 - saturate(dot(bump.xy, bump.xy)));
@@ -437,13 +438,13 @@
                 // #endif
                 fixed3 refrCol = tex2Dlod(_RefractionTex, float4(reflOffsetScrPosFrac, 0, 0)).rgb;
                 // fixed3 refrCol = tex2Dlod(_RefractionTex, fixed4(srcPosFrac, 0, 0)).rgb;
-                fixed3 refrColOrg = tex2Dlod(_RefractionTex, fixed4(reflScrPosFrac, 0, 0)).rgb;
+                fixed3 refrColOrg = tex2Dlod(_RefractionTex, float4(reflScrPosFrac, 0, 0)).rgb;
 
-                float screenDepth = Linear01Depth(tex2Dlod(_CameraDepthTexture, fixed4(offsetSrcPosFrac, 0, 0)).r);
+                float screenDepth = Linear01Depth(tex2Dlod(_CameraDepthTexture, float4(offsetSrcPosFrac, 0, 0)).r);
                 float diff = screenDepth - i.depth;
                 float intersect = 1 - smoothstep(0, _ProjectionParams.w * _EdgeScale, diff);
 
-                float screenDepthNoLinear = tex2Dlod(_CameraDepthTexture, fixed4(srcPosFrac, 0, 0)).r;
+                float screenDepthNoLinear = tex2Dlod(_CameraDepthTexture, float4(srcPosFrac, 0, 0)).r;
                 float screenDepthOrg = Linear01Depth(screenDepthNoLinear);
                 float diffOrg = screenDepthOrg - i.depth;
                 float densityIntersect = smoothstep(0, _ProjectionParams.w * (101 - _density), diff);
@@ -486,7 +487,7 @@
                 reflCol = isUnderWater ? _baseColor : (reflCol * _ReflactAmount + _baseColor * (1 - _ReflactAmount));
 
                 fixed3 refrReflColor = _LightColor0 * specular + reflCol.rgb * (1 - _RefractAmount) * lightCompute + refrCol * _RefractAmount;
-                bubbleAlpha = max((bubbleAlpha - 0.2) * 1.25, intersect) * tex2Dlod(_BubbleMap, fixed4(i.uv1.xy,0,0)).r;
+                bubbleAlpha = max((bubbleAlpha - 0.2) * 1.25, intersect) * tex2Dlod(_BubbleMap, float4(i.uv1.xy,0,0)).r;
                 fixed3 finalColor = bubbleAlpha * lightCompute + (1 - bubbleAlpha) * refrReflColor;
 
                 // float faceDot = dot(fixed3(0,1,0), worldViewDir);

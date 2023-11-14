@@ -17,6 +17,7 @@ public class cloudMove : MonoBehaviour {
 		cloudOffsetVec4 = _mat.GetVector ("_positionOffset");
 	}
 	void OnEnable() {
+		Shader.SetGlobalFloat ("_CloudHeight", (cloudOffsetVec4.y - _mat.GetFloat("_heightCullThreshold")) * _meshFilter.gameObject.transform.localScale.y);
 		/*
 		Bounds _bounds = new Bounds();
 		_bounds.center = Vector3.zero;

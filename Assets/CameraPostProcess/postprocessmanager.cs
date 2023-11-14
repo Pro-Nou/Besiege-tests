@@ -26,6 +26,7 @@ public class postprocessmanager : MonoBehaviour {
 	[Range(0, 1)]
 	public float rainVisibility;
 	public GameObject oceanObject;
+	public GameObject skyboxObject;
 
 	public Camera oceanDepthNormalCamera;
 	public Shader oceanDepthNormalShader;
@@ -48,7 +49,7 @@ public class postprocessmanager : MonoBehaviour {
 	private CommandBuffer ssrLastFramOffset;
 	private CommandBuffer beforeAlpha;
 
-
+	public Texture2D rainMap;
 	public Texture2D rainDropMap;
 	public Texture2D rainDropNormalMap;
 	public Vector4 RainUVTile;
@@ -57,6 +58,16 @@ public class postprocessmanager : MonoBehaviour {
 	public float RainDropScale;
 	[Range(0, 10)]
 	public float RainDropDistortion;
+
+	public Texture2D pondingMap;
+	public Texture2D pondingMapCull;
+	public Vector4 pondingUVTile;
+	[Range(-1, 1)]
+	public float pondingCull;
+	[Range(0, 10)]
+	public float pondingPower;
+	[Range(0, 1)]
+	public float rainClearCoat;
 
 	private RenderTargetIdentifier rt;
 	private RenderTargetIdentifier rt1;
@@ -139,12 +150,19 @@ public class postprocessmanager : MonoBehaviour {
 
 		Shader.SetGlobalFloat ("_OceanHeight", oceanHeight);
 		Shader.SetGlobalFloat ("_rainVisibility", rainVisibility);
+		Shader.SetGlobalTexture("_RainMap", rainMap);
 		Shader.SetGlobalTexture("_RainDropMap", rainDropMap);
 		Shader.SetGlobalTexture("_RainDropNormalMap", rainDropNormalMap);
 		Shader.SetGlobalFloat ("_RainDropScale", RainDropScale);
 		Shader.SetGlobalFloat ("_RainDropDistortion", RainDropDistortion);
 		Shader.SetGlobalVector ("_RainUVTile", RainUVTile);
 		Shader.SetGlobalVector ("_RainDropDistortionTile", RainDropDistortionTile);
+		Shader.SetGlobalTexture ("_PondingMap", pondingMap);
+		Shader.SetGlobalTexture ("_PondingMapCull", pondingMapCull);
+		Shader.SetGlobalVector ("_PondingUVTile", pondingUVTile);
+		Shader.SetGlobalFloat ("_PondingCull", pondingCull);
+		Shader.SetGlobalFloat ("_PondingPower", pondingPower);
+		Shader.SetGlobalFloat ("_RainClearCoat", rainClearCoat);
 
 		blitMat.SetTexture ("_VoronoiMap", voronoiCache);
 		Shader.SetGlobalTexture("_VoronoiNormal", voronoiNormal);
@@ -181,6 +199,7 @@ public class postprocessmanager : MonoBehaviour {
 		oceanObject.GetComponent<MeshFilter> ().mesh.bounds = infBoundOcean;
 		// Debug.Log (oceanObject.transform.GetChild (0).name);
 		oceanObject.transform.GetChild (0).GetComponent<MeshFilter> ().mesh.bounds = infBound;
+		skyboxObject.GetComponent<MeshFilter> ().mesh.bounds = infBound;
 
 
 		//resizeHiZ ();

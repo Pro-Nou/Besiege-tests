@@ -26,29 +26,34 @@ public class CameraMove : MonoBehaviour {
             // this.transform.Rotate(Vector3.forward, _pitchCache);
             // _pitch += _pitchCache;
         }
+		float currentMoveSpeed = _moveSpeed;
+		if (Input.GetKey (KeyCode.LeftShift)) 
+		{
+			currentMoveSpeed *= 5f;
+		}
 		if (Input.GetKey (KeyCode.W))
 		{
-			this.transform.position += _baseCamera.transform.forward * Time.deltaTime * _moveSpeed;
+			this.transform.position += _baseCamera.transform.forward * Time.deltaTime * currentMoveSpeed;
 		}
 		if (Input.GetKey (KeyCode.S))
 		{
-			this.transform.position -= _baseCamera.transform.forward * Time.deltaTime * _moveSpeed;
+			this.transform.position -= _baseCamera.transform.forward * Time.deltaTime * currentMoveSpeed;
 		}
 		if (Input.GetKey (KeyCode.A))
 		{
-			this.transform.position -= _baseCamera.transform.right * Time.deltaTime * _moveSpeed;
+			this.transform.position -= _baseCamera.transform.right * Time.deltaTime * currentMoveSpeed;
 		}
 		if (Input.GetKey (KeyCode.D))
 		{
-			this.transform.position += _baseCamera.transform.right * Time.deltaTime * _moveSpeed;
+			this.transform.position += _baseCamera.transform.right * Time.deltaTime * currentMoveSpeed;
 		}
 		if (Input.GetKey (KeyCode.Space))
 		{
-			this.transform.position += Vector3.up * Time.deltaTime * _moveSpeed;
+			this.transform.position += Vector3.up * Time.deltaTime * currentMoveSpeed;
 		}
 		if (Input.GetKey (KeyCode.LeftControl))
 		{
-			this.transform.position -= Vector3.up * Time.deltaTime * _moveSpeed;
+			this.transform.position -= Vector3.up * Time.deltaTime * currentMoveSpeed;
 		}
 		// if (Input.GetKeyDown (KeyCode.A))
 		// 	moveLeft = !moveLeft;

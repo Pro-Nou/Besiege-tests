@@ -39,6 +39,7 @@
 		sampler2D _AlphaCurve;
 		float4 _Color;
 		float _OceanHeight;
+		float _CloudHeight;
 		float4 _Scale;
 		float _DeploySize;
 		float _Duration;
@@ -175,7 +176,7 @@
 			}
 			fixed4 frag (g2f i) : SV_Target
 			{
-				clip(i.wordPos.y - _OceanHeight);
+				clip(min(i.wordPos.y - _OceanHeight, _CloudHeight - i.wordPos.y));
 				float alpha = tex2Dlod(_AlphaCurve, fixed4(i.lifetime / _Duration, 0, 0, 0)).r;
 				float crossfade = max(abs(i.wordPos.x - _WorldSpaceCameraPos.x), abs(i.wordPos.y - _WorldSpaceCameraPos.y));
 				crossfade = (_DeploySize / 2) - max(abs(i.wordPos.z - _WorldSpaceCameraPos.z), crossfade);
