@@ -84,7 +84,7 @@
 
 				finalOutPut o;
 				// o.depth = float4(EncodeFloatRG(i.depth),  0, 1);
-				o.depth = float4(m_EncodeFloatRG(i.depth),  0, 1);
+				o.depth = float4(m_EncodeFloatRG(i.depth),  1, 1);
 				// o.depth = float4(i.depth + 1, 0, 0, 1);
 				o.normal = float4((viewNormal + 1) / 2, 1);
 				return o;
@@ -141,13 +141,13 @@
 				return float4(h1_u, h2_u, h1_v, h2_v);
 			}
 
-			float3 grayToNormal(sampler2D texIn, float2 texelSizeIn, float2 samplerPos, float xzScale, float yScale)
+			float3 grayToNormal(sampler2D texIn, float2 texelSizeIn, float2 samplerPos)
 			{
 				float4 crossSampler = crossGraySample(texIn, texelSizeIn, samplerPos);
-				float3 tangent_u = float3(texelSizeIn.x * xzScale, (crossSampler.y - crossSampler.x) * yScale, 0);
-				float3 tangent_v = float3(0, (crossSampler.w - crossSampler.z) * yScale, texelSizeIn.y * xzScale);
+				float3 tangent_u = float3(1, (crossSampler.x - crossSampler.y), 0);
+				float3 tangent_v = float3(0, (crossSampler.z - crossSampler.w), 1);
 				float3 normalOut = cross(normalize(tangent_u), normalize(tangent_v));
-				normalOut.y *= -1;
+				normalOut = normalOut.y < 0 ? -normalOut : normalOut;
 				return normalize(normalOut);
 			}
 
@@ -300,14 +300,15 @@
                 float waveMask = max(0, tex2Dlod(_waveMask, float4(i.uv.zw, 0, 0)).r - _waveCull);
                 waveMask = smoothstep(0, 1 - _waveCull, waveMask) * _HeightScale;
 
-                float3 normalOS = grayToNormal(_HeightMap, _HeightMap_TexelSize.xy, i.uv.xy, _HeightBump, waveMask);
+                float3 normalOS = grayToNormal(_HeightMap, _HeightMap_TexelSize.xy, i.uv.xy);
+				normalOS = lerp(fixed3(0,1,0), normalOS, waveMask);
 
                 float3 worldNormal = UnityObjectToWorldNormal(normalOS);
 				float3 viewNormal = normalize(mul((float3x3)unity_WorldToCamera, worldNormal));
 				// viewNormal.z *= -1;
 				finalOutPut o;
 				// o.depth = float4(EncodeFloatRG(i.depth), 0, 1);
-				o.depth = float4(m_EncodeFloatRG(i.depth),  0, 1);
+				o.depth = float4(m_EncodeFloatRG(i.depth),  1, 1);
 				// o.depth = float4(i.depth + 1, 0, 0, 1);
 				o.normal = float4((viewNormal + 1) / 2, 1);
 				return o;

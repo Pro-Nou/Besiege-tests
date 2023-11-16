@@ -33,7 +33,7 @@
     //[NoScaleOffset]_CloudLightMap ("CloudLightMap", 2D) = "white" {}
   }
   SubShader{
-    Tags { "Queue" = "transparent" "RenderType" = "volum" "LightMode" = "ForwardBase" "PerformanceChecks"="False" }
+    Tags { "Queue" = "transparent-1" "RenderType" = "volum" "LightMode" = "ForwardBase" "PerformanceChecks"="False" }
     Blend SrcAlpha OneMinusSrcAlpha
     ZWrite on
 	  ZTest less

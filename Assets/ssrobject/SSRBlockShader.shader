@@ -37,6 +37,8 @@
 		_Smoothness ("Smoothness", Range(0,1)) = 0
 		_ClearCoatAmount ("Clear Coat Amount", Range(0, 1)) = 0
 		_Cutoff  ("Alpha Cutoff" , Range(0 , 1)) = 0.4
+
+		_RainClearCoat  ("Rain Clear Coat" , Range(0, 1)) = 0
 	}
 	SubShader
 	{
@@ -74,9 +76,10 @@
 			float3 grayToNormal(sampler2D texIn, float2 texelSizeIn, float2 samplerPos)
 			{
 				float4 crossSampler = crossGraySample(texIn, texelSizeIn, samplerPos);
-				float3 tangent_u = float3(1, (crossSampler.y - crossSampler.x), 0);
-				float3 tangent_v = float3(0, (crossSampler.w - crossSampler.z), 1);
+				float3 tangent_u = float3(1, (crossSampler.x - crossSampler.y), 0);
+				float3 tangent_v = float3(0, (crossSampler.z - crossSampler.w), 1);
 				float3 normalOut = cross(normalize(tangent_u), normalize(tangent_v));
+				normalOut = normalOut.y < 0 ? -normalOut : normalOut;
 				return normalize(normalOut);
 			}
 			
@@ -175,6 +178,7 @@
 			float _RainDropScale;
 			float _OceanHeight;
 			float _rainVisibility;
+			float _AfterRainAmount;
 			float _RainDropDistortion;
 			float4 _RainDropDistortionTile;
 			float _RainClearCoat;
@@ -270,28 +274,27 @@
 				float3 streak0 = (float3((Value0 + Value1 + Value2 + Value3) / 2, 1));
 				// float3 streak0 = (float3(Value0 + Value1, 1));
 
-				float shouldRainDrop = (worldPos.y > _OceanHeight) * _rainVisibility;
-				streak0.xy *= shouldRainDrop * _RainDropScale;
+				float shouldRainDrop = (worldPos.y > _OceanHeight);
+				streak0.xy *= shouldRainDrop * _rainVisibility * _RainDropScale;
 				streak0 = normalize(streak0);
 				
 				float3 rainDropVoronoi = float3(tex2Dlod(_VoronoiNormal, float4(_RainUVTile.zw * i.worldPosOnlyRot.xz ,0,0)).xy * 2 - 1, 1);
 				rainDropVoronoi.z = sqrt(1.0 - saturate(dot(rainDropVoronoi.xy, rainDropVoronoi.xy)));
-				rainDropVoronoi.xy *=  max(0, worldNormal.y) * shouldRainDrop * 10 * _RainDropScale;
+				rainDropVoronoi.xy *=  max(0, worldNormal.y) * shouldRainDrop * _AfterRainAmount * _RainDropScale;
 				rainDropVoronoi = normalize(rainDropVoronoi);
 
 				rainSmooth = (rainDropVoronoi.z < 0.99 || streak0.z < 0.99) ? 0 : _Smoothness;
-				rainClearCoatAmount = max(_RainClearCoat * shouldRainDrop, rainClearCoatAmount);
+				rainClearCoatAmount = max(_RainClearCoat * shouldRainDrop * _AfterRainAmount, rainClearCoatAmount);
 				bump = bump.z < streak0.z ? bump : streak0;
 				bump = bump.z < rainDropVoronoi.z ? bump : rainDropVoronoi;
 
 				#endif
 				// bump = rainDropVoronoi;
-				bump = normalize(half3(dot(i.TtoW0.xyz, bump), dot(i.TtoW1.xyz, bump), dot(i.TtoW2.xyz, bump)));
-
-
-                float2 offset = bump.xy * 10 * _MainCameraSSRMap_TexelSize.xy;
+                float2 offset = bump.xy * 100 * _MainCameraSSRMap_TexelSize.xy;
                 float4 offsetScrPos = float4(offset * i.scrPos.z + i.scrPos.xy, i.scrPos.zw);
                 float2 srcPosFrac = offsetScrPos.xy / offsetScrPos.w;
+
+				bump = normalize(half3(dot(i.TtoW0.xyz, bump), dot(i.TtoW1.xyz, bump), dot(i.TtoW2.xyz, bump)));
 				
                 fixed3 worldViewDir = normalize(UnityWorldSpaceViewDir(worldPos));
 				fixed3 worldLightDir = normalize(UnityWorldSpaceLightDir(worldPos));
@@ -303,8 +306,9 @@
                 fixed3 worldHalfDir = normalize(worldLightDir + worldViewDir);
 				fixed spec = dot(bump, worldHalfDir);
                 // spec = isUnderWater ? -spec : spec;
-				fixed specSmoothness = lerp(0.0001, 0.2, 1 - _Smoothness);
-				fixed specCularScale = lerp(0.0005, 0.01, 1 - _Smoothness);
+				fixed clearCoatSmoothness = lerp(_Smoothness, 0.85, min(rainClearCoatAmount * 5, 1));
+				fixed specSmoothness = lerp(0.0001, 0.2, 1 - clearCoatSmoothness);
+				fixed specCularScale = lerp(0.0005, 0.1, 1 - clearCoatSmoothness);
 				fixed specular = lerp(0,1,smoothstep(-specSmoothness, specSmoothness, spec+specCularScale-1));
 				// fixed specularClearCoat = lerp(0,1,smoothstep(-0.001, 0.001, spec+0.002-1));
 
@@ -320,7 +324,7 @@
 
                 fixed4 reflCol;
 				// fixed4 reflClearCoat;
-				float SSRRoughness = lerp(0, 7, (1 - _Smoothness));
+				float SSRRoughness = lerp(0, 7, (1 - clearCoatSmoothness));
 
                 if (shouldSSR)
                 {
@@ -355,7 +359,7 @@
 				// reflCol *= _Metallic;
 				// fixed fresnel = (1 - _Smoothness) + (_Smoothness) * pow((1 - dot(-worldViewDir, worldNormal)), 5);
 				final = lerp(final, reflCol * col * (1 - rainClearCoatAmount), _Metallic);
-				fixed4 finalSpec = _LightColor0 * specular * _Smoothness * (1 - rainClearCoatAmount) + _LightColor0 * specular * rainClearCoatAmount;
+				fixed4 finalSpec = _LightColor0 * specular * clearCoatSmoothness * (1 - rainClearCoatAmount) + _LightColor0 * specular * rainClearCoatAmount;
 				final += emiss + glow + UNITY_LIGHTMODEL_AMBIENT * finalAmbient;
 				final += rainClearCoatAmount * reflCol + finalSpec;
 				// fixed4 clearCoat = rainClearCoatAmount * (reflClearCoat + _LightColor0 * specularClearCoat);

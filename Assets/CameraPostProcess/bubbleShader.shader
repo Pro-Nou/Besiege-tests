@@ -7,7 +7,6 @@
 		_SpecularScale ("Specular Scale", Range(0,1)) = 0.02
 		_SpecularSmoothness ("Specular Smoothness", Range(0,1)) = 0.1
 		_RimScale ("Rim Scale", Range(0, 10)) = 1
-        _density ("Density", range(0, 100)) = 10
 		_Scale ("Scale", vector) = (1, 1, 1, 1)
 		_DeploySize ("Deploy Size", range(8, 64)) = 16.0
 		_Duration ("Duration", float) = 5
@@ -54,7 +53,7 @@
 		float _SpecularSmoothness;
 		float _RimScale;
 		float _OceanHeight;
-		float _density;
+		float _OceanDensity;
 		float4 _Scale;
 		float _DeploySize;
 		float _Duration;
@@ -177,6 +176,8 @@
 				float crossfade = max(abs(i.worldPos.x - _WorldSpaceCameraPos.x), abs(i.worldPos.y - _WorldSpaceCameraPos.y));
 				crossfade = (_DeploySize / 2) - max(abs(i.worldPos.z - _WorldSpaceCameraPos.z), crossfade);
 				crossfade = smoothstep(0, 1, crossfade);
+				float underWaterIntersect = smoothstep(0, (101 - _OceanDensity), length(i.worldPos - _WorldSpaceCameraPos));
+				crossfade = min(crossfade, 1 - underWaterIntersect);
 				// float alpha = i.uv.x;
 
 				// fixed4 glow = fixed4(_Color.rgb, _Color.a * rim);

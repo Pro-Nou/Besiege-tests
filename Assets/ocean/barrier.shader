@@ -16,7 +16,7 @@
 
 		Tags
 		{
-			"RenderType"="Transparent"
+			"RenderType"="transparent"
 			"Queue"="Transparent"
 		}
 
@@ -88,32 +88,13 @@
 			{
 				fixed4 fracture = tex2D(_FractureTex, i.uv2);
 				
-				//get depth
 				float screenDepth = Linear01Depth(tex2Dproj(_CameraDepthTexture, UNITY_PROJ_COORD(i.scrPos)).r);
 				float diff = screenDepth - i.depth;
-				//float diff = screenDepth + mul(UNITY_MATRIX_MV, fixed4(i.objectPos,1)).z *_ProjectionParams.w;
-				
-				//intersection
 				float intersect = 1 - smoothstep(0, _ProjectionParams.w*0.5, diff);
-
-				//rim light
 				float rim = 1 - abs(dot(i.normal, normalize(i.viewDir))) * 2;
-
-				//combine 
 				float glow = max(intersect, rim) + _CrackAlpha * fracture;
 
-				//color lerp
 				fixed4 glowColor = fixed4(lerp(_Color.rgb, fixed3(1, 1, 1), pow(glow, 2)), 1);
-				glowColor = fixed4(1,1,1,1);
-				
-				//hex
-				//fixed4 mainTex = tex2D(_MainTex, i.uv);
-
-				//mainTex.g *= triWave(_Time.x * 5, abs(i.objectPos.y) * 2, -0.6) * 2;
-
-				//mainTex.g *= (sin(_Time.z + mainTex.b * 5) + 1)/2;
-
-				//fixed4 hexes= mainTex.g * _Color;
 
 				fixed4 col = _Color * _Color.a + glowColor * glow * _RimAlpha;
 

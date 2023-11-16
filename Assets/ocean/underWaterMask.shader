@@ -3,7 +3,6 @@
 	Properties
 	{
     	_baseColor ("base color", Color) = (1.0,1.0,1.0,1.0)
-        _density ("Density", range(0, 100)) = 10
 	}
 	SubShader
 	{
@@ -22,7 +21,7 @@
 			#include "UnityCG.cginc"
 
 			float4 _baseColor;
-			float _density;
+			float _OceanDensity;
 			sampler2D _CameraDepthTexture;
 			float4 _CameraDepthTexture_TexelSize;
 
@@ -76,7 +75,7 @@
 				float viewDepth = 0;
                 // float viewDepth = -mul(UNITY_MATRIX_MV, fixed4(_WorldSpaceCameraPos.xyz, 1)).z * _ProjectionParams.w;
                 float screenDepthOrg = Linear01Depth(screenDepthNoLinear);
-                float underWaterIntersect = smoothstep(0, _ProjectionParams.w * (101 - _density), screenDepthOrg - (CameraInside ? viewDepth : i.depth));
+                float underWaterIntersect = smoothstep(0, _ProjectionParams.w * (101 - _OceanDensity), screenDepthOrg - (CameraInside ? viewDepth : i.depth));
 
 				float4 clipPos = mul(UNITY_MATRIX_VP, float4(i.worldPos, 1));
             	depth = clipPos.z / clipPos.w  - (_ProjectionParams.y * _ProjectionParams.w);

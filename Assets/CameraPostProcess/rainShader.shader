@@ -46,6 +46,7 @@
 		float4 _StartSpeed;
 		float _totalCount;
 		float _rainVisibility;
+		float _AfterRainAmount;
 
 		[maxvertexcount(6)]
 		void geomSrcSprite(point v2g v[1], inout TriangleStream<g2f> triStream) {
@@ -183,7 +184,7 @@
 				crossfade = smoothstep(0, 1, crossfade);
 				// float alpha = i.uv.x;
 				fixed4 col = tex2Dlod(_MainTex, fixed4(i.uv.xy, 0, 0)) * _Color;
-				col.a *= min(alpha, crossfade) * _rainVisibility;
+				col.a *= min(alpha, crossfade) * _rainVisibility * _AfterRainAmount;
 				return col;
 			}
 			ENDCG

@@ -26,7 +26,6 @@
         _BumpMap ("Normal Map", 2D) = "bump" {}
         _BumpScale ("Bump Scale", range(0,10)) = 1
         _EdgeScale ("Edge Scale", range(0,10)) = 1
-        _density ("Density", range(0, 100)) = 10
         _underWaterCrossFade ("Under Water Cross Fade", range(0, 1)) = 0.1
 		_SpecularScale ("Specular Scale", Range(0,1)) = 0.02
 		_SpecularSmoothness ("Specular Smoothness", Range(0,1)) = 0.1
@@ -68,6 +67,7 @@
         float4 _waveSpeed;
         float _AttachBump;
         float _rainVisibility;
+        float _AfterRainAmount;
 
         float _SSRRoughness;
         float _SSRDistance;
@@ -85,7 +85,7 @@
 
         fixed4 _baseColor;
         float _FrontFace;
-        float _density;
+        float _OceanDensity;
         float _underWaterCrossFade;
         float _EdgeScale;
         float _SpecularScale;
@@ -447,14 +447,14 @@
                 float screenDepthNoLinear = tex2Dlod(_CameraDepthTexture, float4(srcPosFrac, 0, 0)).r;
                 float screenDepthOrg = Linear01Depth(screenDepthNoLinear);
                 float diffOrg = screenDepthOrg - i.depth;
-                float densityIntersect = smoothstep(0, _ProjectionParams.w * (101 - _density), diff);
-                float densityIntersectOrg = smoothstep(0, _ProjectionParams.w * (101 - _density), diffOrg);
+                float densityIntersect = smoothstep(0, _ProjectionParams.w * (101 - _OceanDensity), diff);
+                float densityIntersectOrg = smoothstep(0, _ProjectionParams.w * (101 - _OceanDensity), diffOrg);
                 densityIntersect = lerp(densityIntersect, densityIntersectOrg, intersect);
                 refrCol = lerp(refrCol, refrColOrg, intersect);
                 
                 bump = normalize(half3(dot(TtoW0.xyz, bump), dot(TtoW1.xyz, bump), dot(TtoW2.xyz, bump)));
                 // bump = normalize(half3(dot(i.TtoW0.xyz, bump), dot(i.TtoW1.xyz, bump), dot(i.TtoW2.xyz, bump)));
-                fixed diffValue = lerp((100 - _density) / 100, 1, saturate(dot(bump, worldLightDir)));
+                fixed diffValue = lerp((100 - _OceanDensity) / 100, 1, saturate(dot(bump, worldLightDir)));
                 // diffValue = lerp(0.5,1,diffValue);
                 fixed3 lightCompute = (_LightColor0 * diffValue + UNITY_LIGHTMODEL_AMBIENT);
                 refrCol = _baseColor.rgb * densityIntersect + (1 - densityIntersect) * refrCol;
@@ -494,7 +494,7 @@
                 if (isUnderWater)
                 {
                     float viewDepth = 0;
-                    float underWaterIntersect = smoothstep(0, _ProjectionParams.w * (101 - _density), i.depth - viewDepth);
+                    float underWaterIntersect = smoothstep(0, _ProjectionParams.w * (101 - _OceanDensity), i.depth - viewDepth);
                     // float3 underWaterSampler = (screenDepthOrg < i.depth) ? refrColOrg : finalColor;
                     finalColor = _baseColor.rgb * underWaterIntersect + (1 - underWaterIntersect) * finalColor;
                 }

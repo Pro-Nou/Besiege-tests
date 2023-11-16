@@ -277,8 +277,8 @@
                 
                 float reflLerpx = min(smoothstep(0, _SSRCrossFadeDistance * absDepth_TexelSize.x, reflSampleBase.x), smoothstep(1, 1 - _SSRCrossFadeDistance * absDepth_TexelSize.x, reflSampleBase.x));
                 float reflLerpy = min(smoothstep(0, _SSRCrossFadeDistance * absDepth_TexelSize.y, reflSampleBase.y), smoothstep(1, 1 - _SSRCrossFadeDistance * absDepth_TexelSize.y, reflSampleBase.y));
-                
-                fixed4 reflCol = lerp(fixed4(0, 0, 0, 0), tex2Dlod(_MainCameraRGBAMap, float4(reflSampleBase.x, reflSampleBase.y,0,0)), min(reflValid, min(reflLerpx, reflLerpy)));
+                fixed samplerAlpha = tex2Dlod(_MainCameraOceanDepth, float4(reflSampleBase.x, reflSampleBase.y, 0, 0)).z;
+                fixed4 reflCol = lerp(fixed4(0, 0, 0, 0), tex2Dlod(_MainCameraRGBAMap, float4(reflSampleBase.x, reflSampleBase.y,0,0)), samplerAlpha * min(reflValid, min(reflLerpx, reflLerpy)));
             	// float4 reflEncoded = float4(floor(reflCol.r * 255) + (reflCol.g / 2), floor(reflCol.b * 255) + (reflCol.a / 2), 1, 1);
 				// return reflDecoded;
 				// return float4((reflCol.x << 16 + reflCol.y), (reflCol.z << 16 + reflCol.w), 1, 1);
@@ -461,7 +461,7 @@
 				float largeStep = smoothstep(0, noise, 0.5);
 				float smallStep = smoothstep(0, noise0, 0.08);
 				fixed final = smallStep * largeStep * cell - 0.3;
-				return fixed4(final, 0, 0, 1);
+				return fixed4(smoothstep(0, 0.7, final), 0, 0, 1);
 				// return fixed4(step(noise, 0.03), 0, 0, 1);
 				// return fixed4(noise, 0, 0, 0);
 			}
@@ -509,9 +509,10 @@
 			float3 grayToNormal(sampler2D texIn, float2 texelSizeIn, float2 samplerPos)
 			{
 				float4 crossSampler = crossGraySample(texIn, texelSizeIn, samplerPos);
-				float3 tangent_u = float3(1, (crossSampler.y - crossSampler.x), 0);
-				float3 tangent_v = float3(0, (crossSampler.w - crossSampler.z), 1);
+				float3 tangent_u = float3(1, (crossSampler.x - crossSampler.y), 0);
+				float3 tangent_v = float3(0, (crossSampler.z - crossSampler.w), 1);
 				float3 normalOut = cross(normalize(tangent_u), normalize(tangent_v));
+				normalOut = normalOut.y < 0 ? -normalOut : normalOut;
 				return normalize(normalOut);
 			}
 
@@ -519,7 +520,7 @@
 			{
 				// return fixed4(tex2Dlod(_VoronoiMap, float4(i.uv.xy, 0, 0)).r,0,0,1);
 				float3 normal = grayToNormal(_VoronoiMap, _VoronoiMap_TexelSize.xy, i.uv.xy);
-				normal = (-normal + 1) / 2;
+				normal = (normal + 1) / 2;
 				return fixed4(normal.xz, 1, 1);
 				// return fixed4(step(noise, 0.03), 0, 0, 1);
 				// return fixed4(noise, 0, 0, 0);

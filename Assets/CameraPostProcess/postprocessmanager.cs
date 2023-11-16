@@ -21,10 +21,12 @@ public class postprocessmanager : MonoBehaviour {
 	public Texture2D SSRMask;
 	public float SSRMaskScale;
 
-	[Range(0, 100)]
 	public float oceanHeight;
+	public float oceanDensity;
 	[Range(0, 1)]
 	public float rainVisibility;
+	[Range(0, 1)]
+	public float afterRainAmount;
 	public GameObject oceanObject;
 	public GameObject skyboxObject;
 
@@ -54,20 +56,15 @@ public class postprocessmanager : MonoBehaviour {
 	public Texture2D rainDropNormalMap;
 	public Vector4 RainUVTile;
 	public Vector4 RainDropDistortionTile;
-	[Range(0, 1)]
+	[Range(0, 10)]
 	public float RainDropScale;
 	[Range(0, 10)]
 	public float RainDropDistortion;
 
 	public Texture2D pondingMap;
 	public Texture2D pondingMapCull;
+	public Texture2D pondingWaveMap;
 	public Vector4 pondingUVTile;
-	[Range(-1, 1)]
-	public float pondingCull;
-	[Range(0, 10)]
-	public float pondingPower;
-	[Range(0, 1)]
-	public float rainClearCoat;
 
 	private RenderTargetIdentifier rt;
 	private RenderTargetIdentifier rt1;
@@ -149,7 +146,9 @@ public class postprocessmanager : MonoBehaviour {
 		Shader.SetGlobalFloat ("_MainCameraFarClipPlane", mainCamera.farClipPlane);
 
 		Shader.SetGlobalFloat ("_OceanHeight", oceanHeight);
+		Shader.SetGlobalFloat ("_OceanDensity", oceanDensity);
 		Shader.SetGlobalFloat ("_rainVisibility", rainVisibility);
+		Shader.SetGlobalFloat ("_AfterRainAmount", afterRainAmount);
 		Shader.SetGlobalTexture("_RainMap", rainMap);
 		Shader.SetGlobalTexture("_RainDropMap", rainDropMap);
 		Shader.SetGlobalTexture("_RainDropNormalMap", rainDropNormalMap);
@@ -159,10 +158,8 @@ public class postprocessmanager : MonoBehaviour {
 		Shader.SetGlobalVector ("_RainDropDistortionTile", RainDropDistortionTile);
 		Shader.SetGlobalTexture ("_PondingMap", pondingMap);
 		Shader.SetGlobalTexture ("_PondingMapCull", pondingMapCull);
+		Shader.SetGlobalTexture ("_PondingWaveMap", pondingWaveMap);
 		Shader.SetGlobalVector ("_PondingUVTile", pondingUVTile);
-		Shader.SetGlobalFloat ("_PondingCull", pondingCull);
-		Shader.SetGlobalFloat ("_PondingPower", pondingPower);
-		Shader.SetGlobalFloat ("_RainClearCoat", rainClearCoat);
 
 		blitMat.SetTexture ("_VoronoiMap", voronoiCache);
 		Shader.SetGlobalTexture("_VoronoiNormal", voronoiNormal);
@@ -242,7 +239,9 @@ public class postprocessmanager : MonoBehaviour {
 		blitMat.SetMatrix ("_MainWorldToCamera", mainCamera.transform.worldToLocalMatrix);
 		Graphics.Blit (rgbaResult, ssrFinal, blitMat, 1);
 
-		Graphics.Blit (voronoiCache, voronoiCache, blitMat, 4);
+		if (rainVisibility > 0.2) {
+			Graphics.Blit (voronoiCache, voronoiCache, blitMat, 4);
+		}
 		Graphics.Blit (voronoiCache, voronoiNormal, blitMat, 5);
 		/*
 		Graphics.Blit (ssrDepthCache, HiZArray [0]);
