@@ -26,7 +26,7 @@
 			float4 vertex : SV_POSITION;
 			float lifetime : LIFETIME;
             float2 uv: TEXCOORD0;
-            float3 wordPos: TEXCOORD1;
+            float3 worldPos: TEXCOORD1;
 		};
 		struct particleData
 		{
@@ -65,7 +65,7 @@
 				float2 uv2 = fixed2(0, 0);
 				float2 uv3 = fixed2(1, 0);
 				float2 uv4 = fixed2(1, 1);
-				o1.wordPos = v[0].vertex;
+				o1.worldPos = v[0].vertex;
 				o1.lifetime = v[0].lifetime;
 				o1.vertex = p3;
 				o1.uv.xy = uv3;
@@ -118,27 +118,27 @@
 				o1.lifetime = v[0].lifetime;
 				o1.vertex = p1;
 				o1.uv.xy = uv1;
-				o1.wordPos = wp1;
+				o1.worldPos = wp1;
 				triStream.Append(o1);
 				o1.vertex = p4;
 				o1.uv.xy = uv4;
-				o1.wordPos = wp4;
+				o1.worldPos = wp4;
 				triStream.Append(o1);
 				o1.vertex = p3;
 				o1.uv.xy = uv3;
-				o1.wordPos = wp3;
+				o1.worldPos = wp3;
 				triStream.Append(o1);
 				o1.vertex = p3;
 				o1.uv.xy = uv3;
-				o1.wordPos = wp3;
+				o1.worldPos = wp3;
 				triStream.Append(o1);
 				o1.vertex = p1;
 				o1.uv.xy = uv1;
-				o1.wordPos = wp1;
+				o1.worldPos = wp1;
 				triStream.Append(o1);
 				o1.vertex = p2;
 				o1.uv.xy = uv2;
-				o1.wordPos = wp2;
+				o1.worldPos = wp2;
 				triStream.Append(o1);
 			}
 		}
@@ -177,10 +177,10 @@
 			}
 			fixed4 frag (g2f i) : SV_Target
 			{
-				clip(min(i.wordPos.y - _OceanHeight, _CloudHeight - i.wordPos.y));
+				clip(min(i.worldPos.y - _OceanHeight, _CloudHeight - i.worldPos.y));
 				float alpha = tex2Dlod(_AlphaCurve, fixed4(i.lifetime / _Duration, 0, 0, 0)).r;
-				float crossfade = max(abs(i.wordPos.x - _WorldSpaceCameraPos.x), abs(i.wordPos.y - _WorldSpaceCameraPos.y));
-				crossfade = (_DeploySize / 2) - max(abs(i.wordPos.z - _WorldSpaceCameraPos.z), crossfade);
+				float crossfade = max(abs(i.worldPos.x - _WorldSpaceCameraPos.x), abs(i.worldPos.y - _WorldSpaceCameraPos.y));
+				crossfade = (_DeploySize / 2) - max(abs(i.worldPos.z - _WorldSpaceCameraPos.z), crossfade);
 				crossfade = smoothstep(0, 1, crossfade);
 				// float alpha = i.uv.x;
 				fixed4 col = tex2Dlod(_MainTex, fixed4(i.uv.xy, 0, 0)) * _Color;

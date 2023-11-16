@@ -14,7 +14,7 @@
 	}
 	SubShader
 	{
-		Tags { "RenderType"="transparent" "Queue"="transparent"}
+		Tags { "RenderType"="transparent" "Queue"="transparent" "LightMode"="ForwardBase"}
 		LOD 100
 		cull off
 		zwrite off
@@ -39,6 +39,7 @@
 			{
 				float4 uv : TEXCOORD0;
 				float4 uv2 : TEXCOORD1;
+				float3 worldPos: TEXCOORD2;
 				float4 vertex : SV_POSITION;
 			};
 
@@ -54,6 +55,7 @@
 			fixed4 _ColorInside;
 			float _ColorMult;
 			float _Progress;
+			float _CloudHeight;
 			
 			v2f vert (appdata v)
 			{
@@ -63,15 +65,17 @@
 				o.uv.zw = TRANSFORM_TEX(v.uv, _DistortionMap);
 				o.uv2.xy = TRANSFORM_TEX(v.uv, _DissolveMap);
 				o.uv2.zw = v.uv;
+				o.worldPos = mul(unity_ObjectToWorld, v.vertex).xyz;
 				return o;
 			}
 			
 			fixed4 frag (v2f i) : SV_Target
 			{
 				// sample the texture
+				clip(_CloudHeight - i.worldPos.y);
 				float Distortion = tex2Dlod(_DistortionMap, float4(i.uv.z, 0.5, 0, 0)).r;
 				Distortion = _Distortion * _Progress * (Distortion * 2 - 1);
-				float alpha = tex2Dlod(_MainTex, float4(i.uv.x, i.uv.y + Distortion, 0, 0)).r;
+				float alpha = tex2Dlod(_MainTex, float4(i.uv.x - _Time.y, i.uv.y + Distortion, 0, 0)).r;
 				float progressAlpha = tex2Dlod(_ProgressCurv, float4(_Progress, 0, 0, 0)).r;
 				float cutoff = 1 - progressAlpha;
 				cutoff = max(i.uv2.zw.x - saturate(_Progress * 2), cutoff);
@@ -80,7 +84,7 @@
 				// col.a = col.a;
 				// clip(alpha - cutoff);
 
-				fixed3 col = max(0.4, alpha) * (_ColorMult - cutoff) * lerp(_Color.rgb, _ColorInside.rgb, smoothstep(0, 1, alpha));
+				fixed3 col = max(0.4, alpha) * (_ColorMult - cutoff) * lerp(_Color.rgb, _ColorInside.rgb, alpha);
 				return fixed4(col, alpha);
 			}
 			ENDCG

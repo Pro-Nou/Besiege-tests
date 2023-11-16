@@ -349,11 +349,11 @@
 				fixed4 emiss = _EmissCol * tex2Dlod(_EmissMap, float4(i.uv.zw, 0, 0));
 				fixed rim = (1 - dot(bump, worldViewDir)) * (1 - rainSmooth);
 				fixed4 glow = rim * _RimColor * _LightColor0;
-				fixed4 final = lerp(col, damageCol, _DamageAmount * (1 - damageCol));
+				fixed4 final = col * (1 - _Metallic);
+				final = lerp(final, damageCol, _DamageAmount * (1 - damageCol));
 				final = lerp(final, bloodCol, _BloodAmount * bloodCol.a);
 				final = lerp(final, iceCol, _FreezeAmount * iceCol);
 				// final = lerp(final, lerp(col * reflCol, reflCol, _ReflactPower), _ReflactAmount);
-				final *= (1 - _Metallic);
 				fixed4 finalAmbient = final;
 				final *= fixed4(lightCompute, 1);
 				// reflCol *= _Metallic;

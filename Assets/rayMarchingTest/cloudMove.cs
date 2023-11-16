@@ -11,13 +11,16 @@ public class cloudMove : MonoBehaviour {
 
 	public Vector2 cloudFloatingVelocity;
 	public Vector4 cloudOffsetVec4;
+	public float CloudHeight;
 	// Use this for initialization
 	void Start () {
-		Debug.Log (this.transform.position);
-		cloudOffsetVec4 = _mat.GetVector ("_positionOffset");
+		//Debug.Log (this.transform.position);
 	}
 	void OnEnable() {
-		Shader.SetGlobalFloat ("_CloudHeight", (cloudOffsetVec4.y - _mat.GetFloat("_heightCullThreshold")) * _meshFilter.gameObject.transform.localScale.y);
+		cloudOffsetVec4 = _mat.GetVector ("_positionOffset");
+		CloudHeight = (cloudOffsetVec4.y - _mat.GetFloat ("_heightCullThreshold")) * _meshFilter.gameObject.transform.localScale.y;
+		Debug.Log ("cloud height: " + CloudHeight.ToString());
+		Shader.SetGlobalFloat ("_CloudHeight", CloudHeight);
 		/*
 		Bounds _bounds = new Bounds();
 		_bounds.center = Vector3.zero;

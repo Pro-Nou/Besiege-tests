@@ -51,8 +51,9 @@
 			{
 				depth = 1;
 				// sample the texture
-				fixed4 col = tex2D(_MainTex, i.uv) * _Color;
+				fixed4 col = tex2D(_MainTex, i.uv);
 				col = pow(col, 1 - _HDRThreshold);
+				col *= _Color;
 				return col;
 			}
 			ENDCG

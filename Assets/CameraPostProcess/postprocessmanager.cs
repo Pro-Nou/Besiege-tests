@@ -4,7 +4,7 @@ using UnityEngine.Rendering;
 
 public class postprocessmanager : MonoBehaviour {
 
-	[Range(1,4000)]
+	[Range(1,128)]
 	public float SSRDistance;
 	[Range(-0.001f, 0.001f)]
 	public float SSRPixelBias;
