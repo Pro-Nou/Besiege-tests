@@ -23,6 +23,7 @@ public class postprocessmanager : MonoBehaviour {
 
 	public float oceanHeight;
 	public float oceanDensity;
+	public float oceanUnderWaterVisiableDistance;
 	[Range(0, 1)]
 	public float rainVisibility;
 	[Range(0, 1)]
@@ -70,7 +71,6 @@ public class postprocessmanager : MonoBehaviour {
 	private RenderTargetIdentifier rt1;
 
 	public bool thisBool;
-	private bool lastBool;
 
 	void resizeRT(ref RenderTexture rtIN, Vector2 Size)
 	{
@@ -147,6 +147,7 @@ public class postprocessmanager : MonoBehaviour {
 
 		Shader.SetGlobalFloat ("_OceanHeight", oceanHeight);
 		Shader.SetGlobalFloat ("_OceanDensity", oceanDensity);
+		Shader.SetGlobalFloat ("_OceanUnderWaterVisiableDistance", oceanUnderWaterVisiableDistance);
 		Shader.SetGlobalFloat ("_rainVisibility", rainVisibility);
 		Shader.SetGlobalFloat ("_AfterRainAmount", afterRainAmount);
 		Shader.SetGlobalTexture("_RainMap", rainMap);
@@ -170,7 +171,6 @@ public class postprocessmanager : MonoBehaviour {
 	// Use this for initialization
 	void Start () {
 		thisBool = false;
-		lastBool = false;
 
 
 		ssrFinal.Release ();
@@ -259,10 +259,10 @@ public class postprocessmanager : MonoBehaviour {
 		//oceanDepthNormalCamera.Render ();
 
 		//Shader.SetGlobalMatrix ("_Main_Camera_To_World", mainCamera.cameraToWorldMatrix);
-		if (lastBool != thisBool) {
+		//if (lastBool != thisBool) {
+		if (Input.GetKeyDown(KeyCode.R) && Input.GetKey(KeyCode.LeftShift)) {
 			UpdateAllValue ();
 			resizeOnce ();
-			lastBool = thisBool;
 		}
 
 	}

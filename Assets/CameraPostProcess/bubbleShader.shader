@@ -54,6 +54,7 @@
 		float _RimScale;
 		float _OceanHeight;
 		float _OceanDensity;
+		float _OceanUnderWaterVisiableDistance;
 		float4 _Scale;
 		float _DeploySize;
 		float _Duration;
@@ -176,7 +177,7 @@
 				float crossfade = max(abs(i.worldPos.x - _WorldSpaceCameraPos.x), abs(i.worldPos.y - _WorldSpaceCameraPos.y));
 				crossfade = (_DeploySize / 2) - max(abs(i.worldPos.z - _WorldSpaceCameraPos.z), crossfade);
 				crossfade = smoothstep(0, 1, crossfade);
-				float underWaterIntersect = smoothstep(0, (101 - _OceanDensity), length(i.worldPos - _WorldSpaceCameraPos));
+				float underWaterIntersect = _OceanDensity * smoothstep(0, _OceanUnderWaterVisiableDistance, length(i.worldPos - _WorldSpaceCameraPos));
 				crossfade = min(crossfade, 1 - underWaterIntersect);
 				// float alpha = i.uv.x;
 

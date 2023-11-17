@@ -8,10 +8,10 @@ public class movTexTest : MonoBehaviour {
 	void Start () {
 		MeshRenderer renderer = GetComponent<MeshRenderer> ();
 		AS = GetComponent<AudioSource> ();
-		renderer.material.mainTexture = movTex;
+		// renderer.material.mainTexture = movTex;
 		movTex.loop = false;
-		Debug.Log (QualitySettings.shadowCascades);
-		Debug.Log (QualitySettings.shadowCascade4Split);
+		// Debug.Log (QualitySettings.shadowCascades);
+		// Debug.Log (QualitySettings.shadowCascade4Split);
 
 	}
 	

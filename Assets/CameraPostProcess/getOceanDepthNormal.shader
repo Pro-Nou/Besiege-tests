@@ -272,8 +272,11 @@
 
                 float2 waveOffset = _waveSpeed.xy * _Time.x;
                 float2 waveMaskOffset = _waveSpeed.zw * _Time.x;
-                output.uv.xy = TRANSFORM_TEX(uv.xy, _HeightMap) + waveOffset;
-                output.uv.zw = TRANSFORM_TEX(uv.xy, _waveMask) + waveMaskOffset;
+                output.worldPos = mul(unity_ObjectToWorld, positionOS).xyz;
+                // output.uv.xy = TRANSFORM_TEX(uv.xy, _HeightMap) + waveOffset;
+                // output.uv.zw = TRANSFORM_TEX(uv.xy, _waveMask) + waveMaskOffset;
+                output.uv.xy = TRANSFORM_TEX(output.worldPos.xz, _HeightMap) + waveOffset;
+                output.uv.zw = TRANSFORM_TEX(output.worldPos.xz, _waveMask) + waveMaskOffset;
                 bool shouldInteract = uv.z <= (1 - _interactFadeUV) && uv.z >= _interactFadeUV && uv.w <= (1 - _interactFadeUV) && uv.w >= _interactFadeUV;
                 
                 if (shouldInteract)
@@ -282,12 +285,11 @@
                     waveMask = smoothstep(0, 1 - _waveCull, waveMask) * _HeightScale;
                     float height = tex2Dlod(_HeightMap, float4(output.uv.xy, 0, 0)).r * waveMask;
                     positionOS.y += height;
+					output.worldPos.y += height;
                 }
 
 				output.pos = UnityObjectToClipPos(positionOS);
                 output.scrPos = ComputeScreenPos(output.pos);
-
-                output.worldPos = mul(unity_ObjectToWorld, positionOS).xyz;
 
         		output.depth = -mul(UNITY_MATRIX_MV, positionOS).z / _ProjectionParams.z;
 				return output;
@@ -302,6 +304,7 @@
 
                 float3 normalOS = grayToNormal(_HeightMap, _HeightMap_TexelSize.xy, i.uv.xy);
 				normalOS = lerp(fixed3(0,1,0), normalOS, waveMask);
+				normalOS.xz *= -1;
 
                 float3 worldNormal = UnityObjectToWorldNormal(normalOS);
 				float3 viewNormal = normalize(mul((float3x3)unity_WorldToCamera, worldNormal));

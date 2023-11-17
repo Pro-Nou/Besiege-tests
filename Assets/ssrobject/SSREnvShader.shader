@@ -32,7 +32,7 @@
 	}
 	SubShader
 	{
-		Tags { "RenderType"="Opaque" "QUEUE"="alphatest" "IGNOREPROJECTOR"="true"}
+		Tags { "RenderType"="Opaque" "QUEUE"="geometry" "IGNOREPROJECTOR"="true"}
 		LOD 100
 
 		Pass

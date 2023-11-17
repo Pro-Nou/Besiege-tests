@@ -86,6 +86,7 @@
         fixed4 _baseColor;
         float _FrontFace;
         float _OceanDensity;
+        float _OceanUnderWaterVisiableDistance;
         float _underWaterCrossFade;
         float _EdgeScale;
         float _SpecularScale;
@@ -166,7 +167,7 @@
             float3 tangent_u = float3(1, (crossSampler.y - crossSampler.x), 0);
             float3 tangent_v = float3(0, (crossSampler.w - crossSampler.z), 1);
             float3 normalOut = cross(normalize(tangent_u), normalize(tangent_v));
-            normalOut.y *= -1;
+            normalOut = normalOut.y < 0 ? -normalOut : normalOut;
             return normalize(normalOut);
         }
         float pRand(float valueIn)
@@ -295,7 +296,7 @@
         }
         Pass
         {	
-            Tags {"IGNOREPROJECTOR"="true" "SHADOWSUPPORT"="true"}
+            Tags {"IGNOREPROJECTOR"="true" "SHADOWSUPPORT"="true""LightMode" = "ForwardBase"}
             CGPROGRAM
             #pragma vertex vert
             #pragma hull HullS
@@ -335,10 +336,15 @@
 
                 float2 waveOffset = _waveSpeed.xy * _Time.x;
                 float2 waveMaskOffset = _waveSpeed.zw * _Time.x;
-                output.uv.xy = TRANSFORM_TEX(uv.xy, _HeightMap) + waveOffset;
-                output.uv.zw = TRANSFORM_TEX(uv.xy, _BumpMap) + waveOffset;
-                output.uv1.xy = TRANSFORM_TEX(uv.xy, _BubbleMap);
-                output.uv1.zw = TRANSFORM_TEX(uv.xy, _waveMask) + waveMaskOffset;
+                // output.uv.xy = TRANSFORM_TEX(uv.xy, _HeightMap) + waveOffset;
+                // output.uv.zw = TRANSFORM_TEX(uv.xy, _BumpMap) + waveOffset;
+                // output.uv1.xy = TRANSFORM_TEX(uv.xy, _BubbleMap);
+                // output.uv1.zw = TRANSFORM_TEX(uv.xy, _waveMask) + waveMaskOffset;
+                output.worldPos = mul(unity_ObjectToWorld, positionOS).xyz;
+                output.uv.xy = TRANSFORM_TEX(output.worldPos.xz, _HeightMap) + waveOffset;
+                output.uv.zw = TRANSFORM_TEX(output.worldPos.xz, _BumpMap) + waveOffset;
+                output.uv1.xy = TRANSFORM_TEX(output.worldPos.xz, _BubbleMap);
+                output.uv1.zw = TRANSFORM_TEX(output.worldPos.xz, _waveMask) + waveMaskOffset;
                 output.uv2.xy = float2(0,0);
                 output.uv2.zw = uv.zw;
 
@@ -349,12 +355,12 @@
                     waveMask = smoothstep(0, 1 - _waveCull, waveMask) * _HeightScale;
                     float height = tex2Dlod(_HeightMap, float4(output.uv.xy, 0, 0)).r * waveMask;
                     positionOS.y += height;
+                    output.worldPos.y += height;
                 }
 
 				output.pos = UnityObjectToClipPos(positionOS);
                 output.scrPos = ComputeScreenPos(output.pos);
 
-                output.worldPos = mul(unity_ObjectToWorld, positionOS).xyz;
                 output.worldNormal = UnityObjectToWorldNormal(normalize(normalOS));
                 output.objectTangent = tangentOS;
 
@@ -413,6 +419,7 @@
                     float3 normalAttach = grayToNormal(_AttachMap, _AttachMap_TexelSize.xy, i.uv2.zw);
                     normalOS.xz += (bubbleAlpha < 0.2) * normalRain.xz * _rainVisibility;
                 }
+                // normalOS.xz *= -1;
                 float3 worldNormal = UnityObjectToWorldNormal(normalize(normalOS));
                 float3 worldTangent = UnityObjectToWorldDir(i.objectTangent.xyz);
                 float3 worldBinormal = cross(worldNormal, worldTangent) * i.objectTangent.w;
@@ -421,13 +428,14 @@
                 float4 TtoW1 = float4(worldTangent.y, worldBinormal.y, worldNormal.y, i.worldPos.y);
                 float4 TtoW2 = float4(worldTangent.z, worldBinormal.z, worldNormal.z, i.worldPos.z);
 
-                fixed4 packedNormal = tex2Dlod(_BumpMap, float4(i.uv.zw,0,0));
+                float2 normalFlow = _Time.x * float2(0.1,0.1);
+                fixed4 packedNormal = tex2Dlod(_BumpMap, float4(i.uv.zw + normalFlow,0,0));
+                fixed4 packedNormal_inv = tex2Dlod(_BumpMap, float4(i.uv.zw - normalFlow,0,0));
                 fixed3 bump = fixed3(0,0,1);
-                bump.xy = (packedNormal.xy * 2 - 1 ) * _BumpScale;
+                bump.xy = ((packedNormal.xy + packedNormal_inv.xy) - 1) * _BumpScale;
                 bump.z = sqrt(1.0 - saturate(dot(bump.xy, bump.xy)));
-                float2 offset = bump.xy * _Distortion * 10 * _RefractionTex_TexelSize.xy;
-                float4 offsetScrPos = float4(offset * i.scrPos.z + i.scrPos.xy, i.scrPos.zw);
-                float2 offsetSrcPosFrac = offsetScrPos.xy / offsetScrPos.w;
+                float2 offset = bump.xy * _Distortion * 10 * _RefractionTex_TexelSize.xy * i.scrPos.z;
+                float2 offsetSrcPosFrac = (offset.xy + i.scrPos.xy) / i.scrPos.w;
                 float2 reflScrPosFrac = srcPosFrac;
                 float2 reflOffsetScrPosFrac = offsetSrcPosFrac;
 
@@ -443,22 +451,27 @@
                 float screenDepth = Linear01Depth(tex2Dlod(_CameraDepthTexture, float4(offsetSrcPosFrac, 0, 0)).r);
                 float diff = screenDepth - i.depth;
                 float intersect = 1 - smoothstep(0, _ProjectionParams.w * _EdgeScale, diff);
+                refrCol = lerp(refrCol, refrColOrg, intersect);
 
                 float screenDepthNoLinear = tex2Dlod(_CameraDepthTexture, float4(srcPosFrac, 0, 0)).r;
                 float screenDepthOrg = Linear01Depth(screenDepthNoLinear);
                 float diffOrg = screenDepthOrg - i.depth;
-                float densityIntersect = smoothstep(0, _ProjectionParams.w * (101 - _OceanDensity), diff);
-                float densityIntersectOrg = smoothstep(0, _ProjectionParams.w * (101 - _OceanDensity), diffOrg);
-                densityIntersect = lerp(densityIntersect, densityIntersectOrg, intersect);
-                refrCol = lerp(refrCol, refrColOrg, intersect);
+                float densityIntersect = smoothstep(0, _ProjectionParams.w * _OceanUnderWaterVisiableDistance, diff);
+                float densityIntersectOrg = smoothstep(0, _ProjectionParams.w * _OceanUnderWaterVisiableDistance, diffOrg);
+                float underWaterIntersect = smoothstep(0, _ProjectionParams.w * _OceanUnderWaterVisiableDistance, i.depth - 0);
+                densityIntersect = isUnderWater ? underWaterIntersect : lerp(densityIntersect, densityIntersectOrg, intersect);
+                densityIntersect *= _OceanDensity;
+                intersect = step(0, diff) * intersect;
                 
                 bump = normalize(half3(dot(TtoW0.xyz, bump), dot(TtoW1.xyz, bump), dot(TtoW2.xyz, bump)));
+                // bump.xz *= -1;
                 // bump = normalize(half3(dot(i.TtoW0.xyz, bump), dot(i.TtoW1.xyz, bump), dot(i.TtoW2.xyz, bump)));
-                fixed diffValue = lerp((100 - _OceanDensity) / 100, 1, saturate(dot(bump, worldLightDir)));
+                fixed diffValue = lerp(1 - _OceanDensity, 1, saturate(dot(bump, worldLightDir)));
                 // diffValue = lerp(0.5,1,diffValue);
                 fixed3 lightCompute = (_LightColor0 * diffValue + UNITY_LIGHTMODEL_AMBIENT);
-                refrCol = _baseColor.rgb * densityIntersect + (1 - densityIntersect) * refrCol;
-                intersect = step(0, diff) * intersect;
+                fixed4 diffColor = isUnderWater ? _baseColor : _baseColor * fixed4(lightCompute, 1);
+                // return fixed4(lightCompute, 1);
+                refrCol = diffColor.rgb * densityIntersect + (1 - densityIntersect) * refrCol;
 
                 bool shouldSSR = i.depth * _ProjectionParams.z < _SSRDistance && _ProjectionParams.y == 0.3 && _ProjectionParams.z == _MainCameraFarClipPlane;
                 float3 reflDir = reflect(-worldViewDir, bump);
@@ -481,23 +494,24 @@
 				fixed spec = dot(bump, worldHalfDir);
                 // spec = isUnderWater ? -spec : spec;
 				fixed specular = lerp(0,1,smoothstep(-_SpecularSmoothness,_SpecularSmoothness,spec+_SpecularScale-1)) * step(0.001,_SpecularScale);
-
+                specular *= (1 - underWaterIntersect * isUnderWater);
                 
                 // fixed4 reflCol = fixed4(1,1,1,1);
-                reflCol = isUnderWater ? _baseColor : (reflCol * _ReflactAmount + _baseColor * (1 - _ReflactAmount));
-
-                fixed3 refrReflColor = _LightColor0 * specular + reflCol.rgb * (1 - _RefractAmount) * lightCompute + refrCol * _RefractAmount;
+                reflCol = isUnderWater ? diffColor : lerp(diffColor, reflCol, _ReflactAmount);
+                // fixed3 refrReflColor = _LightColor0 * specular + reflCol.rgb * (1 - _RefractAmount) * lightCompute + refrCol * _RefractAmount;
+                fixed3 refrReflColor = _LightColor0 * specular + lerp(reflCol.rgb, refrCol, _RefractAmount);
                 bubbleAlpha = max((bubbleAlpha - 0.2) * 1.25, intersect) * tex2Dlod(_BubbleMap, float4(i.uv1.xy,0,0)).r;
+                bubbleAlpha = saturate(bubbleAlpha) * (1 - underWaterIntersect * isUnderWater);
                 fixed3 finalColor = bubbleAlpha * lightCompute + (1 - bubbleAlpha) * refrReflColor;
 
                 // float faceDot = dot(fixed3(0,1,0), worldViewDir);
-                if (isUnderWater)
-                {
-                    float viewDepth = 0;
-                    float underWaterIntersect = smoothstep(0, _ProjectionParams.w * (101 - _OceanDensity), i.depth - viewDepth);
-                    // float3 underWaterSampler = (screenDepthOrg < i.depth) ? refrColOrg : finalColor;
-                    finalColor = _baseColor.rgb * underWaterIntersect + (1 - underWaterIntersect) * finalColor;
-                }
+                // if (isUnderWater)
+                // {
+                //     float viewDepth = 0;
+                //     float underWaterIntersect = smoothstep(0, _ProjectionParams.w * (101 - _OceanDensity), i.depth - viewDepth);
+                //     // float3 underWaterSampler = (screenDepthOrg < i.depth) ? refrColOrg : finalColor;
+                //     finalColor = _baseColor.rgb * underWaterIntersect + (1 - underWaterIntersect) * finalColor;
+                // }
                 
                 fixed4 final = fixed4(finalColor, 1);
 				UNITY_APPLY_FOG(i.fogCoord, final); 

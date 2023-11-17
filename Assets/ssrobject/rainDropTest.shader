@@ -88,7 +88,7 @@
 				float3 tangent_u = float3(texelSizeIn.x * xzScale, (crossSampler.y - crossSampler.x) * yScale, 0);
 				float3 tangent_v = float3(0, (crossSampler.w - crossSampler.z) * yScale, texelSizeIn.y * xzScale);
 				float3 normalOut = cross(normalize(tangent_u), normalize(tangent_v));
-				normalOut.y *= -1;
+				normalOut = normalOut.y < 0 ? -normalOut : normalOut;
 				return normalize(normalOut);
 			}
 

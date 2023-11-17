@@ -29,6 +29,7 @@ public class lightningPlayer : MonoBehaviour {
 		hitPS2.emission.GetBursts (PSB2);
 		PSB2 [0].time *= duration;
 		hitPS2.emission.SetBursts (PSB2);
+		hitPS2.gravityModifier = this.transform.localScale.y * 0.16f;
 
 		lightningMat = lightningMain.GetComponent<MeshRenderer> ().material;
 		lightningCrackMat = lightningCrack.GetComponent<MeshRenderer> ().material;
@@ -92,8 +93,8 @@ public class lightningPlayer : MonoBehaviour {
 		}
 		progress = lifeTime / duration;
 
-		float progressScale = progress * 2f + 3f;
-		lightningMain.transform.localScale = new Vector3 (progressScale, 1f, progressScale);
+		float progressScale = progress * 4f + 1f;
+		lightningMain.transform.localScale = new Vector3 (progressScale, 3f, progressScale);
 		lightningMat.SetFloat ("_Progress", progress);
 		lightningAnchorMat.SetFloat ("_Progress", progress);
 	}

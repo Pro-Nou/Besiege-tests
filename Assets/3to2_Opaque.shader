@@ -25,7 +25,7 @@
 	}
 	SubShader
 	{
-		Tags { "RenderType"="Opaque"  "PerformanceChecks"="False"}
+		Tags { "RenderType"="Opaque"  "PerformanceChecks"="False" "QUEUE"="alphatest"}
 		LOD 100
 
 
@@ -34,6 +34,7 @@
 
 		Pass
 		{	
+			Tags { "RenderType"="Opaque"  "PerformanceChecks"="False" "QUEUE"="alphatest"}
 			Cull front
 			CGPROGRAM
 			#pragma vertex vert
@@ -180,5 +181,7 @@
 		}
 
 	}
-	FallBack "Diffuse"
+	// FallBack "Diffuse"
+	// FallBack "Mobile/VertexLit"
+	FallBack "Transparent/Cutout/VertexLit"
 }
