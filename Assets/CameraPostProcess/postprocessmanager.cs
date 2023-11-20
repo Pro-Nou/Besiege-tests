@@ -1,14 +1,18 @@
 ﻿using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine.Rendering;
 
 public class postprocessmanager : MonoBehaviour {
 
-	[Range(1,128)]
+	//[Range(1, 128)]
+	public static postprocessmanager instance;
+
+	public bool SSREnable;
 	public float SSRDistance;
-	[Range(-0.001f, 0.001f)]
+	[Range(-1f, 1f)]
 	public float SSRPixelBias;
-	[Range(-0.001f, 0.001f)]
+	[Range(-1f, 1f)]
 	public float SSRPixelThickness;
 	[Range(0, 128)]
 	public float SSRCrossFadeDistance;
@@ -16,10 +20,23 @@ public class postprocessmanager : MonoBehaviour {
 	public float SSRQuality;
 	[Range(0, 4)]
 	public float SSRResDecrease;
+	[Range(0, 4)]
+	public float SSRTResDecrease;
 	[Range(0, 512)]
 	public float SSRMaxStep;
 	public Texture2D SSRMask;
 	public float SSRMaskScale;
+
+	public struct LightData // 12 floats, 48 bytes
+	{
+		public Color lightColor;
+		public Vector3 position;
+		public Vector3 forward;
+		public float distance;
+		public float angleCos;
+	}
+	public List<LightData> lightDatas;
+	public ComputeBuffer lightBuffer;
 
 	public float oceanHeight;
 	public float oceanDensity;
@@ -46,6 +63,8 @@ public class postprocessmanager : MonoBehaviour {
 	public RenderTexture ssrDepthCache;
 	public RenderTexture ssrNormalCache;
 	public RenderTexture ssrFinal;
+	public RenderTexture ssrtSpecPre;
+	public RenderTexture ssrtSpecFinal;
 	public RenderTexture voronoiCache;
 	public RenderTexture voronoiNormal;
 	public ReflectionProbe reflProbe;
@@ -71,7 +90,18 @@ public class postprocessmanager : MonoBehaviour {
 	private RenderTargetIdentifier rt1;
 
 	public bool thisBool;
-
+	private void Awake()
+	{
+		instance = this;
+		lightDatas = new List<LightData> ();
+		lightBuffer = new ComputeBuffer(128, 48);
+	} 
+	private void UpdateSSRT()
+	{
+		lightBuffer.SetData (lightDatas.ToArray());
+		blitMat.SetBuffer ("_LightDataDataBuffer", lightBuffer);
+		blitMat.SetFloat ("_LightCount", lightDatas.Count);
+	}
 	void resizeRT(ref RenderTexture rtIN, Vector2 Size)
 	{
 		rtIN.Release ();
@@ -111,16 +141,21 @@ public class postprocessmanager : MonoBehaviour {
 	void resizeOnce()
 	{
 		float ssrResDec = Mathf.Pow (2, SSRResDecrease);
+		float ssrtResDec = Mathf.Pow (2, SSRTResDecrease);
 		resizeRT (ref rgbaResult, new Vector2(Screen.width, Screen.height));
 		resizeRT (ref rgbaFinal, new Vector2(Screen.width, Screen.height));
 		resizeRT (ref ssrDepthCache, new Vector2(Screen.width / ssrResDec, Screen.height / ssrResDec));
 		resizeRT (ref ssrNormalCache, new Vector2(Screen.width / ssrResDec, Screen.height / ssrResDec));
+		resizeRT (ref ssrtSpecPre, new Vector2(Screen.width / ssrtResDec, Screen.height / ssrtResDec));
+		//resizeRT (ref ssrtSpecPre, new Vector2(Screen.width / ssrtResDec, Screen.height / ssrtResDec));
 		//resizeRT (ref ssrFinal, new Vector2(Screen.width, Screen.height));
 		resizeRT (ref ssrFinal, new Vector2(1024f, 1024f));
+		resizeRT (ref ssrtSpecFinal, new Vector2(1024f, 1024f));
 
-		RenderBuffer[] rb = new RenderBuffer[2];
+		RenderBuffer[] rb = new RenderBuffer[3];
 		rb [0] = ssrDepthCache.colorBuffer;
 		rb [1] = ssrNormalCache.colorBuffer;
+		rb [2] = ssrtSpecPre.colorBuffer;
 		oceanDepthNormalCamera.SetTargetBuffers(rb, ssrDepthCache.depthBuffer);
 	}
 	void UpdateAllValue()
@@ -133,8 +168,15 @@ public class postprocessmanager : MonoBehaviour {
 		Shader.SetGlobalTexture("_MainCameraRGBAMap", rgbaFinal);
 		Shader.SetGlobalTexture("_MainCameraOceanDepth", ssrDepthCache);
 		Shader.SetGlobalTexture("_MainCameraOceanNormal", ssrNormalCache);
+		Shader.SetGlobalTexture("_MainCameraSpecPre", ssrtSpecPre);
 		Shader.SetGlobalTexture("_MainCameraSSRMap", ssrFinal);
 
+		if (SSREnable) {
+			Shader.EnableKeyword ("_SSRENABLE_ON");
+		} else {
+			Shader.DisableKeyword ("_SSRENABLE_ON");
+		}
+		reflProbe.gameObject.SetActive (SSREnable);
 		Shader.SetGlobalFloat ("_SSRPixelBias", SSRPixelBias);
 		Shader.SetGlobalFloat ("_SSRPixelThickness", SSRPixelThickness);
 		Shader.SetGlobalFloat ("_SSRCrossFadeDistance", SSRCrossFadeDistance);
@@ -226,6 +268,8 @@ public class postprocessmanager : MonoBehaviour {
 		blitMat.SetMatrix ("_MainCameraToWorld", mainCamera.transform.localToWorldMatrix);
 		blitMat.SetMatrix ("_MainCameraProjection", mainCamera.projectionMatrix);
 		blitMat.SetMatrix ("_MainCameraInvProjection", mainCamera.projectionMatrix.inverse);
+		//UpdateSSRT ();
+
 
 		if (mainCamera.fieldOfView != oceanDepthNormalCamera.fieldOfView) {
 			oceanDepthNormalCamera.fieldOfView = mainCamera.fieldOfView;
@@ -237,7 +281,9 @@ public class postprocessmanager : MonoBehaviour {
 
 		Graphics.Blit (rgbaResult, rgbaFinal, blitMat, 2);
 		blitMat.SetMatrix ("_MainWorldToCamera", mainCamera.transform.worldToLocalMatrix);
-		Graphics.Blit (rgbaResult, ssrFinal, blitMat, 1);
+		if (SSREnable) {
+			Graphics.Blit (rgbaResult, ssrFinal, blitMat, 1);
+		}
 
 		if (rainVisibility > 0.2) {
 			Graphics.Blit (voronoiCache, voronoiCache, blitMat, 4);
@@ -282,6 +328,12 @@ public class postprocessmanager : MonoBehaviour {
 	void OnPostRender()
 	{
 		blitMat.SetMatrix ("_MainWorldToCamera", mainCamera.transform.worldToLocalMatrix);
+	}
+
+	void OnDestroy()
+	{
+		lightBuffer.Release();
+		lightBuffer = null;
 	}
 	// void OnRenderImage(RenderTexture source, RenderTexture destination)
 	// {

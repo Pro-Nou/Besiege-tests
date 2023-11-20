@@ -11,13 +11,29 @@
 		// return enc;
 		return ((n + 1) / 2).xy;
 	}
-	inline float2 m_EncodeFloatRG(float depth)
+	inline float3 m_EncodeFloatRG(float depth)
 	{
-		float encodeFactor = 255;
-		float depth255 = depth * encodeFactor;
-		float depthMod = depth255 % 1;
-		float2 rg = float2((depth255 - depthMod) / encodeFactor, depthMod);
-		return rg;
+		// float encodeFactor = 255;
+		// float depth255 = depth * encodeFactor;
+		// float depthMod = depth255 % 1;
+		// float2 rg = float2((depth255 - depthMod) / encodeFactor, depthMod);
+		float encodeFactor = 128;
+
+		float depthMod0 = (depth * encodeFactor); 
+		float depthMod1 = depthMod0 % 1;
+		depthMod0 -= depthMod1;
+		depthMod0 /= encodeFactor;
+
+		depthMod1 *= encodeFactor;
+		float depthMod2 = depthMod1 % 1;
+		depthMod1 -= depthMod2;
+		depthMod1 /= encodeFactor;
+
+		// depthMod2 = depthMod2 / encodeFactor;
+		// depthMod2 = 0;
+		// float depthMod2 = 0;
+		float3 rgb = float3(depthMod0, depthMod1, depthMod2);
+		return rgb;
 	}
 	ENDCG
 	SubShader
@@ -37,12 +53,19 @@
 			#pragma vertex vert
 			#pragma fragment frag
       		#pragma multi_compile_fwdbase
+			#pragma shader_feature _RCVRAIN_ON
 			#include "UnityCG.cginc"
  
 			sampler2D _MainTex;
 			float4 _MainTex_ST;
 			half4 _Color;
 			fixed _Cutoff;
+
+			float _ClearCoatAmount;
+			float _OceanHeight;
+			float _RainClearCoat;
+			float _AfterRainAmount;
+			float _Smoothness;
 
 			struct appdata
 			{
@@ -57,21 +80,24 @@
 				float depth : DEPTH;
 				float3 normal : NORMAL;
 				float2 uv : TEXCOORD0;
+				float3 worldPos : TEXCOORD1;
 			};
 
 			struct finalOutPut
 			{
 				float4 depth : SV_Target0;
 				float4 normal : SV_Target1;
+				float4 specPre : SV_Target2;
 			};
 
 			v2f vert (appdata v)
 			{
 				v2f o;
 				o.vertex = UnityObjectToClipPos(v.vertex);
-				o.depth = -mul(UNITY_MATRIX_MV, v.vertex).z / _ProjectionParams.z;
+				o.depth = -mul(UNITY_MATRIX_MV, v.vertex).z * _ProjectionParams.w;
 				o.normal = UnityObjectToWorldNormal(v.normal);
 				o.uv.xy = TRANSFORM_TEX(v.uv, _MainTex);
+				o.worldPos = mul(unity_ObjectToWorld, v.vertex).xyz;
 
 				return o;
 			}
@@ -84,9 +110,20 @@
 
 				finalOutPut o;
 				// o.depth = float4(EncodeFloatRG(i.depth),  0, 1);
-				o.depth = float4(m_EncodeFloatRG(i.depth),  1, 1);
+				o.depth = float4(m_EncodeFloatRG(i.depth), 1);
 				// o.depth = float4(i.depth + 1, 0, 0, 1);
 				o.normal = float4((viewNormal + 1) / 2, 1);
+				
+				fixed rainClearCoatAmount = _ClearCoatAmount;
+				#if _RCVRAIN_ON
+				float shouldRainDrop = (i.worldPos.y > _OceanHeight);
+				rainClearCoatAmount = max(_RainClearCoat * shouldRainDrop * _AfterRainAmount, rainClearCoatAmount);
+				#endif
+				fixed clearCoatSmoothness = lerp(_Smoothness, 0.85, min(rainClearCoatAmount * 5, 1));
+				fixed specSmoothness = lerp(0.0001, 0.2, 1 - clearCoatSmoothness);
+				fixed specCularScale = lerp(0.0005, 0.1, 1 - clearCoatSmoothness);
+				
+				o.specPre = float4(specCularScale, specSmoothness, 0, 1);
 				return o;
 			}
 			ENDCG
@@ -182,10 +219,13 @@
 			{
 				float4 depth : SV_Target0;
 				float4 normal : SV_Target1;
+				float4 specPre : SV_Target2;
 			};
 
 			sampler2D _MainTex;
 			float4 _MainTex_ST;
+			float _SpecularScale;
+			float _SpecularSmoothness;
 			
 			Attribute vert(Attribute v)
 			{
@@ -291,7 +331,7 @@
 				output.pos = UnityObjectToClipPos(positionOS);
                 output.scrPos = ComputeScreenPos(output.pos);
 
-        		output.depth = -mul(UNITY_MATRIX_MV, positionOS).z / _ProjectionParams.z;
+        		output.depth = -mul(UNITY_MATRIX_MV, positionOS).z * _ProjectionParams.w;
 				return output;
 			}
 			finalOutPut frag(DomainOutput i)
@@ -311,9 +351,10 @@
 				// viewNormal.z *= -1;
 				finalOutPut o;
 				// o.depth = float4(EncodeFloatRG(i.depth), 0, 1);
-				o.depth = float4(m_EncodeFloatRG(i.depth),  1, 1);
+				o.depth = float4(m_EncodeFloatRG(i.depth), 1);
 				// o.depth = float4(i.depth + 1, 0, 0, 1);
 				o.normal = float4((viewNormal + 1) / 2, 1);
+				o.specPre = float4(_SpecularScale, _SpecularSmoothness, 0, 1);
 				return o;
 			}
 			ENDCG

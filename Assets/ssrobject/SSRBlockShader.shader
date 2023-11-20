@@ -56,8 +56,9 @@
 			// make fog work
 			#pragma multi_compile_fog
 			#pragma multi_compile_fwdbase
-			#pragma multi_compile _RCVRAIN_ON _RCVRAIN_OFF
-			#pragma multi_compile _NORMALTYPE_NORMAL _NORMALTYPE_BUMP
+			#pragma shader_feature _RCVRAIN_ON
+			#pragma shader_feature _NORMALTYPE_NORMAL
+			#pragma shader_feature _SSRENABLE_ON
 			
 			#include "UnityCG.cginc"
 			#include "AutoLight.cginc"
@@ -160,6 +161,7 @@
 			float4 _DamageMap_TexelSize;
 			sampler2D _NormalMap;
 			float4 _NormalMap_ST;
+			float4 _NormalMap_TexelSize;
 			sampler2D _RainDropMap;
 			fixed4 _Color;
 			sampler2D _RainDropNormalMap;
@@ -231,7 +233,7 @@
 				#if _NORMALTYPE_NORMAL
 				fixed4 packedNormal = tex2Dlod(_NormalMap, float4(i.uv2.zw,0,0));
                 bump.xy = (packedNormal.xy * 2 - 1 ) * _NormalScale;
-				#elif _NORMALTYPE_BUMP
+				#else
 				float3 grayNormal = grayToNormal(_NormalMap, _NormalMap_TexelSize.xy, i.uv2.zw);
                 bump.xy = grayNormal.xz * _NormalScale;
 				#endif
@@ -322,8 +324,9 @@
                 fixed3 lightCompute = (_LightColor0 * diffValue);
 
 
-                fixed4 reflCol;
+                fixed4 reflCol = fixed4(0,0,0,1);
 				// fixed4 reflClearCoat;
+				#if _SSRENABLE_ON
 				float SSRRoughness = lerp(0, 7, (1 - clearCoatSmoothness));
 
                 if (shouldSSR)
@@ -340,6 +343,7 @@
 					// reflClearCoat = texCUBElod(_MainCameraReflProbe, float4(reflDir, 0));
 					reflCol = texCubeBlur(_MainCameraReflProbe, reflDir, _MainCameraReflProbe_TexelSize.xy, SSRRoughness);
 				}
+				#endif
                 // fixed4 final = max(fixed4(0.1,0.1,0.1,1), col) * (reflCol * _ReflactAmount + fixed4(1, 1, 1, 1) * (1 - _ReflactAmount));
 				// fixed4 final = col;
 				// final = final * _ReflactAmount + col * (1 - _ReflactAmount);

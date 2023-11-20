@@ -14,10 +14,12 @@
 		n.z = sqrt(1 - dot(n.xy, n.xy));
 		return n;
 	}
-	inline float m_DecodeFloatRG(float2 rg)
+	inline float m_DecodeFloatRG(float4 rgba)
 	{
-		float encodeFactor = 255;
-		float depth = (rg.r * encodeFactor + rg.g) / encodeFactor;
+		// float encodeFactor = 255;
+		// float depth = (rg.r * encodeFactor + rg.g) / encodeFactor;
+		float depth = (rgba.r + (rgba.g / 128) + (rgba.b / 16384));
+		// float depth = (rgba.r + (rgba.g / 128));
 		return depth;
 	}
 	inline float2 m_EncodeFloatRG(float depth)
@@ -99,7 +101,19 @@
 			float4x4 _MainCameraToWorld;
 			float4x4 _MainCameraProjection;
 			float4x4 _MainCameraInvProjection;
-					
+				
+			struct LightData
+			{
+				fixed4 lightColor;
+				float3 position;
+				float3 forward;
+				float distance;
+				float angleCos;
+			};
+
+			StructuredBuffer<LightData> _LightDataDataBuffer;
+			float _LightCount;
+
 			struct v2f
 			{
 				float4 pos : SV_POSITION;
@@ -172,11 +186,12 @@
 				// }
 				// depth /= _SSRDistance;
 
-                float depth = m_DecodeFloatRG(tex2Dlod(_MainCameraOceanDepth, float4(i.uv.xy, 0, 0)).xy);
+                float depth = m_DecodeFloatRG(tex2Dlod(_MainCameraOceanDepth, float4(i.uv.xy, 0, 0)));
 				if (depth >= 1)
 				{
 					return fixed4(0, 0, 0, 0);
 				}
+				// return float4(depth, 0, 0, 1);
                 // float depth = (tex2Dlod(_MainCameraOceanDepth, float4(i.uv.xy, 0, 0)).x - 1);
 				
 				
@@ -196,8 +211,8 @@
 				// return float4(reflDir, 1);
 				reflViewDir +=  SSROffset * _SSRMaskScale;
 				float3 reflViewPos = viewPos + reflViewDir;
-				reflViewPos = reflViewPos.z < 0.5 * 0.3 ? viewPos + reflViewDir * ((viewPos.z - 0.5 * 0.3) / (viewPos.z - reflViewPos.z)) : reflViewPos;
-				reflViewPos *= 2;
+				reflViewPos = reflViewPos.z < 0.3 ? viewPos + reflViewDir * ((viewPos.z - 0.3) / (viewPos.z - reflViewPos.z)) : reflViewPos;
+				// reflViewPos *= 2;
                 // fixed height = reflViewPos.z / unity_CameraProjection._m11;
                 fixed height = reflViewPos.z / _MainCameraProjection._m11;
                 fixed width = _ScreenParams.x / _ScreenParams.y * height;
@@ -230,6 +245,8 @@
                 // float SSRlength0 = length(worldPos - _WorldSpaceCameraPos.xyz);
 				float SSRlength0 = length(viewPos);
                 // float SSRlength0 = length(i.worldPos - _WorldSpaceCameraPos.xyz);
+				float pixelBias = _SSRPixelBias / _SSRDistance;
+				float pixelThickness = _SSRPixelThickness / _SSRDistance;
                 float SSRcount = 0;
                 while (reflLod >= 0 && SSRcount < _SSRMaxStep)
                 {
@@ -241,9 +258,9 @@
                 		continue;
                 	}
                 	float2 ndcPos0 = reflSamplePos.xy * 2 - 1;
-                	float3 clipVec0 = float3(ndcPos0.x, ndcPos0.y, -1) * _SSRDistance;
+                	float3 clipVec0 = float3(ndcPos0.x, ndcPos0.y, -1);
                 	// float3 viewVec0 = mul(unity_CameraInvProjection, clipVec0.xyzz).xyz;
-                	float3 viewVec0 = mul(_MainCameraInvProjection, clipVec0.xyzz).xyz;
+                	float3 viewVec0 = mul(_MainCameraInvProjection, clipVec0.xyzz).xyz * _SSRDistance;
 					float3 viewPos1 = getCross(viewPos, reflViewDir, float3(0, 0, 0), viewVec0);
                 	float SSRlength1 = length(viewPos1 - viewPos) + SSRlength0;
                 	float depth0 = viewPos1 / viewVec0;
@@ -253,10 +270,10 @@
                 	}
 					
 					// float screenDepth0 = DecodeFloatRG(tex2Dlod(_MainCameraOceanDepth, float4(reflSamplePos, 0, 0)).xy);
-					float screenDepth0 = m_DecodeFloatRG(tex2Dlod(_MainCameraOceanDepth, float4(reflSamplePos, 0, reflLod)).xy);
+					float screenDepth0 = m_DecodeFloatRG(tex2Dlod(_MainCameraOceanDepth, float4(reflSamplePos, 0, reflLod)));
 					// float screenDepth0 = (tex2Dlod(_MainCameraOceanDepth, float4(reflSamplePos, 0, 0)).x - 1) / _SSRDistance;
 
-                	if (screenDepth0 + reflSampleLength * _SSRPixelBias * SSRlength1 * 0.01 < depth0 && depth0 < screenDepth0 + reflSampleLength * max(abs(lastDepth - depth0), _SSRPixelThickness))
+                	if (screenDepth0 + SSRlength1 * pixelBias * 0.01 < depth0 && depth0 < screenDepth0 + max(abs(lastDepth - depth0), pixelThickness))
                 	{
                 		reflValid = (reflLod == 0);
                 		thisScrDepth = screenDepth0;
@@ -277,7 +294,8 @@
                 
                 float reflLerpx = min(smoothstep(0, _SSRCrossFadeDistance * absDepth_TexelSize.x, reflSampleBase.x), smoothstep(1, 1 - _SSRCrossFadeDistance * absDepth_TexelSize.x, reflSampleBase.x));
                 float reflLerpy = min(smoothstep(0, _SSRCrossFadeDistance * absDepth_TexelSize.y, reflSampleBase.y), smoothstep(1, 1 - _SSRCrossFadeDistance * absDepth_TexelSize.y, reflSampleBase.y));
-                fixed samplerAlpha = tex2Dlod(_MainCameraOceanDepth, float4(reflSampleBase.x, reflSampleBase.y, 0, 0)).z;
+                fixed samplerAlpha = tex2Dlod(_MainCameraOceanDepth, float4(reflSampleBase.x, reflSampleBase.y, 0, 0)).w;
+				// return float4(reflValid, 0, 0, 1);
                 fixed4 reflCol = lerp(fixed4(0, 0, 0, 0), tex2Dlod(_MainCameraRGBAMap, float4(reflSampleBase.x, reflSampleBase.y,0,0)), samplerAlpha * min(reflValid, min(reflLerpx, reflLerpy)));
             	// float4 reflEncoded = float4(floor(reflCol.r * 255) + (reflCol.g / 2), floor(reflCol.b * 255) + (reflCol.a / 2), 1, 1);
 				// return reflDecoded;
@@ -324,7 +342,7 @@
 
 			fixed4 frag(v2f i) : SV_Target
 			{
-				float thisDepth = m_DecodeFloatRG(tex2Dlod(_MainCameraOceanDepth, float4(i.uv.xy, 0, 0)).xy);
+				float thisDepth = m_DecodeFloatRG(tex2Dlod(_MainCameraOceanDepth, float4(i.uv.xy, 0, 0)));
 				// float thisDepth = (tex2Dlod(_MainCameraOceanDepth, float4(i.uv.xy, 0, 0)).x - 1) / _SSRDistance;
 				float2 thisNdcPos = i.uv.xy * 2 - 1;
 				float3 thisClipVec = float3(thisNdcPos.x, thisNdcPos.y, -1);
@@ -383,10 +401,10 @@
 			fixed4 frag(v2f i) : SV_Target
 			{
 				float2 samplerTexelSize = float2(abs(_SourceDepthTexture_TexelSize).x, abs(_SourceDepthTexture_TexelSize.y)) / 2;
-				float depth1 = m_DecodeFloatRG(tex2Dlod(_SourceDepthTexture, float4(i.uv.xy + float2(1,1) * samplerTexelSize, 0, 0)).xy);
-				float depth2 = m_DecodeFloatRG(tex2Dlod(_SourceDepthTexture, float4(i.uv.xy + float2(1,-1) * samplerTexelSize, 0, 0)).xy);
-				float depth3 = m_DecodeFloatRG(tex2Dlod(_SourceDepthTexture, float4(i.uv.xy + float2(-1,-1) * samplerTexelSize, 0, 0)).xy);
-				float depth4 = m_DecodeFloatRG(tex2Dlod(_SourceDepthTexture, float4(i.uv.xy + float2(-1,1) * samplerTexelSize, 0, 0)).xy);
+				float depth1 = m_DecodeFloatRG(tex2Dlod(_SourceDepthTexture, float4(i.uv.xy + float2(1,1) * samplerTexelSize, 0, 0)));
+				float depth2 = m_DecodeFloatRG(tex2Dlod(_SourceDepthTexture, float4(i.uv.xy + float2(1,-1) * samplerTexelSize, 0, 0)));
+				float depth3 = m_DecodeFloatRG(tex2Dlod(_SourceDepthTexture, float4(i.uv.xy + float2(-1,-1) * samplerTexelSize, 0, 0)));
+				float depth4 = m_DecodeFloatRG(tex2Dlod(_SourceDepthTexture, float4(i.uv.xy + float2(-1,1) * samplerTexelSize, 0, 0)));
 				float depthFinal = min(min(depth1, depth2), min(depth3, depth4));
 				return fixed4(m_EncodeFloatRG(depthFinal), 0, 1);
 				// return fixed4(0, 0, 0, 0);

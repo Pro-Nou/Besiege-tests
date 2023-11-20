@@ -304,6 +304,7 @@
             #pragma fragment frag
 			#pragma multi_compile_fog
 			#pragma multi_compile_fwdbase
+            #pragma shader_feature _SSRENABLE_ON
 
             #include "UnityCG.cginc"
 			#include "AutoLight.cginc"
@@ -476,8 +477,9 @@
                 bool shouldSSR = i.depth * _ProjectionParams.z < _SSRDistance && _ProjectionParams.y == 0.3 && _ProjectionParams.z == _MainCameraFarClipPlane;
                 float3 reflDir = reflect(-worldViewDir, bump);
                 
-                fixed4 reflCol;
+                fixed4 reflCol = fixed4(0,0,0,1);
 
+                #if _SSRENABLE_ON
                 if (shouldSSR)
                 {
 					reflCol = tex2DBlurLod(_MainCameraSSRMap, offsetSrcPosFrac, _MainCameraSSRMap_TexelSize, _SSRRoughness);
@@ -488,7 +490,7 @@
 					// reflCol = texCUBElod(_MainCameraReflProbe, fixed4(reflDir, 0));
 					reflCol = texCubeBlur(_MainCameraReflProbe, reflDir, _MainCameraReflProbe_TexelSize.xy, _SSRRoughness);
 				}
-
+                #endif
                 worldViewDir.y *= isUnderWater ? -1 : 1;
 				fixed3 worldHalfDir = normalize(worldLightDir + worldViewDir);
 				fixed spec = dot(bump, worldHalfDir);
