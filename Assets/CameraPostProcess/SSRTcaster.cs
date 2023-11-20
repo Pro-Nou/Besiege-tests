@@ -8,6 +8,7 @@ public class SSRTcaster : MonoBehaviour {
 	public float distance;
 	[Range(0,180)]
 	public float angle;
+	public postprocessmanager ppmanager;
 
 	public postprocessmanager.LightData lightData;
 	// Use this for initialization
@@ -21,21 +22,24 @@ public class SSRTcaster : MonoBehaviour {
 	}
 	void OnEnable() {
 		StartCoroutine (enableSelf());
+		//ppmanager.lightDatas.Add (lightData);
 	}
 	void OnDisable() {
-		postprocessmanager.instance.lightDatas.Remove (lightData);
+		ppmanager.lightDatas.Remove (lightData);
 	}
 	// Update is called once per frame
 	void Update () {
 		lightData.lightColor = lightColor;
 		lightData.position = this.transform.position;
 		lightData.forward = this.transform.forward;
+		//ppmanager.lightDatas [index] = lightData;
 	}
 	private System.Collections.IEnumerator enableSelf(){
-		while (postprocessmanager.instance == null) {
+		yield return new WaitForSeconds (1f);
+		while (ppmanager.lightDatas == null) {
 			yield return new WaitForSeconds (1f);
 		}
-		postprocessmanager.instance.lightDatas.Add (lightData);
+		ppmanager.lightDatas.Add (lightData);
 		yield break;
 	}
 }

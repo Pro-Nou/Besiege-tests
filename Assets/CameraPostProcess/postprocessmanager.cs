@@ -92,12 +92,15 @@ public class postprocessmanager : MonoBehaviour {
 	public bool thisBool;
 	private void Awake()
 	{
-		instance = this;
 		lightDatas = new List<LightData> ();
+		instance = this;
 		lightBuffer = new ComputeBuffer(128, 48);
 	} 
 	private void UpdateSSRT()
 	{
+		while (lightDatas.Count > 128) {
+			lightDatas.RemoveAt (0);
+		}
 		lightBuffer.SetData (lightDatas.ToArray());
 		blitMat.SetBuffer ("_LightDataDataBuffer", lightBuffer);
 		blitMat.SetFloat ("_LightCount", lightDatas.Count);
@@ -170,6 +173,7 @@ public class postprocessmanager : MonoBehaviour {
 		Shader.SetGlobalTexture("_MainCameraOceanNormal", ssrNormalCache);
 		Shader.SetGlobalTexture("_MainCameraSpecPre", ssrtSpecPre);
 		Shader.SetGlobalTexture("_MainCameraSSRMap", ssrFinal);
+		Shader.SetGlobalTexture("_MainCameraSSRTSpecMap", ssrtSpecFinal);
 
 		if (SSREnable) {
 			Shader.EnableKeyword ("_SSRENABLE_ON");
@@ -268,7 +272,7 @@ public class postprocessmanager : MonoBehaviour {
 		blitMat.SetMatrix ("_MainCameraToWorld", mainCamera.transform.localToWorldMatrix);
 		blitMat.SetMatrix ("_MainCameraProjection", mainCamera.projectionMatrix);
 		blitMat.SetMatrix ("_MainCameraInvProjection", mainCamera.projectionMatrix.inverse);
-		//UpdateSSRT ();
+		UpdateSSRT ();
 
 
 		if (mainCamera.fieldOfView != oceanDepthNormalCamera.fieldOfView) {
@@ -283,6 +287,7 @@ public class postprocessmanager : MonoBehaviour {
 		blitMat.SetMatrix ("_MainWorldToCamera", mainCamera.transform.worldToLocalMatrix);
 		if (SSREnable) {
 			Graphics.Blit (rgbaResult, ssrFinal, blitMat, 1);
+			Graphics.Blit (rgbaResult, ssrtSpecFinal, blitMat, 6);
 		}
 
 		if (rainVisibility > 0.2) {

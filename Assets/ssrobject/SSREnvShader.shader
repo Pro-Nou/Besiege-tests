@@ -146,6 +146,8 @@
 			float4 _MainCameraReflProbe_TexelSize;
 			sampler2D _MainCameraSSRMap;
 			float4 _MainCameraSSRMap_TexelSize;
+			sampler2D _MainCameraSSRTSpecMap;
+			float4 _MainCameraSSRTSpecMap_TexelSize;
 
 			sampler2D _MainTex;
 			float4 _MainTex_ST;
@@ -332,9 +334,9 @@
 				fixed spec = dot(bump, worldHalfDir);
                 // spec = isUnderWater ? -spec : spec;
 				fixed clearCoatSmoothness = lerp(_Smoothness, 0.85, min(rainClearCoatAmount * 5, 1));
-				fixed specSmoothness = lerp(0.0001, 0.2, 1 - clearCoatSmoothness);
+				fixed specSmoothness = lerp(0.0001, 0.5, 1 - clearCoatSmoothness);
 				fixed specCularScale = lerp(0.0005, 0.01, 1 - clearCoatSmoothness);
-				fixed specular = lerp(0,1,smoothstep(-specSmoothness, specSmoothness, spec+specCularScale-1));
+				fixed specular = smoothstep(-specSmoothness, specSmoothness, spec+specCularScale-1);
 				// fixed specularClearCoat = lerp(0,1,smoothstep(-0.001, 0.001, spec+0.002-1));
 
                 fixed diffValue = dot(bump, worldLightDir);
@@ -349,6 +351,7 @@
                 fixed3 lightCompute = (_LightColor0 * diffValue);
 
 
+				fixed4 ssrtSpecCol = fixed4(0,0,0,1);
                 fixed4 reflCol = fixed4(0,0,0,1);
 				fixed4 reflPonding = fixed4(0,0,0,1);
 
@@ -356,9 +359,12 @@
 				float SSRRoughness = lerp(0, 7, (1 - clearCoatSmoothness));
                 if (shouldSSR)
                 {
-					reflPonding = tex2Dlod(_MainCameraSSRMap, float4((i.scrPos.xy + _MainCameraSSRMap_TexelSize.xy * 200 * i.scrPos.z * normalRain.xz) / i.scrPos.w, 0, 0));
+					float2 pondingUV = (i.scrPos.xy + _MainCameraSSRMap_TexelSize.xy * 200 * i.scrPos.z * normalRain.xz) / i.scrPos.w;
+					reflPonding = tex2Dlod(_MainCameraSSRMap, float4(pondingUV, 0, 0));
 					reflPonding = lerp(texCUBElod(_MainCameraReflProbe, float4(reflect(-worldViewDir, normalRain), 0)), reflPonding, reflPonding.a);
                    
+					ssrtSpecCol = tex2Dlod(_MainCameraSSRTSpecMap, float4(srcPosFrac, 0, 0));
+                    // ssrtSpecCol.a = 1;
 					reflCol = tex2DBlurLod(_MainCameraSSRMap, srcPosFrac, _MainCameraSSRMap_TexelSize, SSRRoughness);
                     // reflCol = lerp(texCUBElod(_MainCameraReflProbe, fixed4(reflDir, 0)), reflCol, reflCol.a);
 					 reflCol = lerp(texCubeBlur(_MainCameraReflProbe, reflDir, _MainCameraReflProbe_TexelSize.xy, SSRRoughness), reflCol, reflCol.a);
@@ -384,10 +390,11 @@
 				// reflCol *= rainMetallic;
 				// fixed fresnel = (1 - _Smoothness) + (_Smoothness) * pow((1 - dot(-worldViewDir, worldNormal)), 5);
 				final = lerp(final, reflCol * col * (1 - rainClearCoatAmount), rainMetallic);
-				fixed4 finalSpec = _LightColor0 * specular * clearCoatSmoothness * (1 - rainClearCoatAmount) + _LightColor0 * specular * rainClearCoatAmount;
+				fixed4 specCol = _LightColor0 * specular + ssrtSpecCol;
+				fixed4 finalSpec = specCol * clearCoatSmoothness * (1 - rainClearCoatAmount) + specCol * rainClearCoatAmount;
 				final += emiss + glow + UNITY_LIGHTMODEL_AMBIENT * finalAmbient;
 				final += rainClearCoatAmount * reflCol + finalSpec;
-				fixed4 pondingCol = reflPonding + specular * _LightColor0;
+				fixed4 pondingCol = reflPonding + specCol;
 				final = lerp(final, pondingCol, saturate(ponding * _PondingPower));
 				// fixed4 clearCoat = rainClearCoatAmount * (reflClearCoat + _LightColor0 * specularClearCoat);
 				// apply fog

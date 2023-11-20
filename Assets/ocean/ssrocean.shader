@@ -44,6 +44,8 @@
         float4 _MainCameraReflProbe_TexelSize;
         sampler2D _MainCameraSSRMap;
         float4 _MainCameraSSRMap_TexelSize;
+        sampler2D _MainCameraSSRTSpecMap;
+        float4 _MainCameraSSRTSpecMap_TexelSize;
 
         sampler2D _HeightMap;
         float4 _HeightMap_ST;
@@ -478,10 +480,14 @@
                 float3 reflDir = reflect(-worldViewDir, bump);
                 
                 fixed4 reflCol = fixed4(0,0,0,1);
+                fixed4 ssrtSpecCol = fixed4(0,0,0,1);
 
                 #if _SSRENABLE_ON
                 if (shouldSSR)
                 {
+					ssrtSpecCol = tex2Dlod(_MainCameraSSRTSpecMap, float4(srcPosFrac, 0, 0));
+					// ssrtSpecCol = floor(ssrtSpecCol) / 128;
+                    // ssrtSpecCol.a = 1;
 					reflCol = tex2DBlurLod(_MainCameraSSRMap, offsetSrcPosFrac, _MainCameraSSRMap_TexelSize, _SSRRoughness);
                     reflCol = lerp(texCubeBlur(_MainCameraReflProbe, reflDir, _MainCameraReflProbe_TexelSize.xy, _SSRRoughness), reflCol, reflCol.a);
                 }
@@ -496,12 +502,13 @@
 				fixed spec = dot(bump, worldHalfDir);
                 // spec = isUnderWater ? -spec : spec;
 				fixed specular = lerp(0,1,smoothstep(-_SpecularSmoothness,_SpecularSmoothness,spec+_SpecularScale-1)) * step(0.001,_SpecularScale);
-                specular *= (1 - underWaterIntersect * isUnderWater);
+                fixed4 specCol = _LightColor0 * specular + ssrtSpecCol;
+                specCol *= (1 - underWaterIntersect * isUnderWater);
                 
                 // fixed4 reflCol = fixed4(1,1,1,1);
                 reflCol = isUnderWater ? diffColor : lerp(diffColor, reflCol, _ReflactAmount);
                 // fixed3 refrReflColor = _LightColor0 * specular + reflCol.rgb * (1 - _RefractAmount) * lightCompute + refrCol * _RefractAmount;
-                fixed3 refrReflColor = _LightColor0 * specular + lerp(reflCol.rgb, refrCol, _RefractAmount);
+                fixed3 refrReflColor = specCol + lerp(reflCol.rgb, refrCol, _RefractAmount);
                 bubbleAlpha = max((bubbleAlpha - 0.2) * 1.25, intersect) * tex2Dlod(_BubbleMap, float4(i.uv1.xy,0,0)).r;
                 bubbleAlpha = saturate(bubbleAlpha) * (1 - underWaterIntersect * isUnderWater);
                 fixed3 finalColor = bubbleAlpha * lightCompute + (1 - bubbleAlpha) * refrReflColor;

@@ -101,18 +101,6 @@
 			float4x4 _MainCameraToWorld;
 			float4x4 _MainCameraProjection;
 			float4x4 _MainCameraInvProjection;
-				
-			struct LightData
-			{
-				fixed4 lightColor;
-				float3 position;
-				float3 forward;
-				float distance;
-				float angleCos;
-			};
-
-			StructuredBuffer<LightData> _LightDataDataBuffer;
-			float _LightCount;
 
 			struct v2f
 			{
@@ -348,9 +336,9 @@
 				float3 thisClipVec = float3(thisNdcPos.x, thisNdcPos.y, -1);
 				float3 thisViewVec = mul(_MainCameraInvProjection, thisClipVec.xyzz).xyz;
 				float3 thisViewPos = thisViewVec * _SSRDistance * thisDepth;
-				float3 thisWroldPos = mul(_MainCameraToWorld, float4(thisViewPos, 1)).xyz;
+				float3 thisWorldPos = mul(_MainCameraToWorld, float4(thisViewPos, 1)).xyz;
 				// thisWroldPos = thisWroldPos - _WorldSpaceCameraPos.xyz;
-				float3 lastViewVec = 2 * mul(_MainWorldToCamera, float4(thisWroldPos, 1)).xyz;
+				float3 lastViewVec = 2 * mul(_MainWorldToCamera, float4(thisWorldPos, 1)).xyz;
 				// lastViewVec.z *= -1;
                 fixed height = lastViewVec.z / _MainCameraProjection._m11;
                 fixed width = _ScreenParams.x / _ScreenParams.y * height;
@@ -542,6 +530,98 @@
 				return fixed4(normal.xz, 1, 1);
 				// return fixed4(step(noise, 0.03), 0, 0, 1);
 				// return fixed4(noise, 0, 0, 0);
+			}
+			ENDCG
+		}
+		//SSRT Spec compute
+		pass
+		{
+			ZTest Off
+			Cull Off
+			ZWrite Off
+			Fog{ Mode Off }
+			CGPROGRAM
+			#pragma vertex vert
+			#pragma fragment frag
+			#include "UnityCG.cginc"
+			
+			struct v2f
+			{
+				float4 pos : SV_POSITION;
+				float2 uv  : TEXCOORD0;
+			};
+				
+			struct LightData
+			{
+				fixed4 lightColor;
+				float3 position;
+				float3 forward;
+				float distance;
+				float angleCos;
+			};
+
+			StructuredBuffer<LightData> _LightDataDataBuffer;
+			float _LightCount;
+
+			float4x4 _MainWorldToCamera;
+			float4x4 _MainCameraToWorld;
+			float4x4 _MainCameraProjection;
+			float4x4 _MainCameraInvProjection;
+			sampler2D _MainCameraOceanDepth;
+			sampler2D _MainCameraOceanNormal;
+			sampler2D _MainCameraSpecPre;
+			float _SSRDistance;
+
+			v2f vert(appdata_img v)
+			{
+				v2f o;
+				o.pos = UnityObjectToClipPos(v.vertex);
+				o.uv.xy = v.texcoord.xy;
+		
+				return o;
+			}
+			float4 frag(v2f i) : SV_Target
+			{
+				float Depth = m_DecodeFloatRG(tex2Dlod(_MainCameraOceanDepth, float4(i.uv.xy, 0, 0)));
+				if (Depth >= 1)
+				{
+					return fixed4(0, 0, 0, 0);
+				}
+				float2 NdcPos = i.uv.xy * 2 - 1;
+				float3 ClipVec = float3(NdcPos.x, NdcPos.y, -1);
+				float3 ViewVec = mul(_MainCameraInvProjection, ClipVec.xyzz).xyz;
+				float3 ViewPos = ViewVec * _SSRDistance * Depth;
+
+				float3 specFinal = fixed3(0, 0, 0);
+				float3 specDiff = fixed3 (0, 0, 0);
+				for (int index = 0; index < _LightCount; index++) 
+				{
+					float3 viewLightPos = mul(_MainWorldToCamera, float4(_LightDataDataBuffer[index].position, 1)).xyz;
+					float distance = length(ViewPos - viewLightPos);
+					if (distance > _LightDataDataBuffer[index].distance * 4) 
+					{
+						continue;
+					}
+					fixed strenthRefl = 1 - (distance / (_LightDataDataBuffer[index].distance * 4));
+					fixed strenth = 1 - (distance / _LightDataDataBuffer[index].distance);
+					fixed2 specCache = tex2Dlod(_MainCameraSpecPre, float4(i.uv.xy, 0, 0)).rg;
+					fixed specCularScale = specCache.r;
+					fixed specSmoothness = specCache.g;
+
+					fixed3 viewViewDir = -normalize(ViewPos);
+					fixed3 viewLightDir = -normalize(ViewPos - viewLightPos);
+					float3 viewNormal = (tex2Dlod(_MainCameraOceanNormal, float4(i.uv.xy, 0, 0)).xyz) * 2 - 1;
+
+					fixed3 viewHalfDir = normalize(viewLightDir + viewViewDir);
+					fixed spec = dot(viewNormal, viewHalfDir);
+					fixed specular = smoothstep(-specSmoothness, specSmoothness, spec+specCularScale-1);
+					specFinal += saturate(_LightDataDataBuffer[index].lightColor.rgb * specular * strenthRefl);
+					specFinal += saturate(_LightDataDataBuffer[index].lightColor.rgb * strenth);
+					// specFinal = floor(specFinal);
+				}
+				// specFinal = floor(saturate(specFinal) * 128) + saturate(specDiff) * 0.9;
+				specFinal = saturate(specFinal);
+				return float4(specFinal, 1);
 			}
 			ENDCG
 		}
