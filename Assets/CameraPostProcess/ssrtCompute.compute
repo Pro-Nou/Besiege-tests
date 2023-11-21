@@ -1,0 +1,112 @@
+﻿// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+struct LightData
+{
+	float4 lightColor;
+	float3 position;
+	float3 forward;
+	float distance;
+	float angleCos;
+	float angleCrossFade;
+	float ambientAmount;
+};
+
+StructuredBuffer<LightData> _LightDataDataBuffer;
+float _LightCount;
+
+struct CameraMatrixs
+{
+	float4x4 _MainWorldToCamera;
+	float4x4 _MainCameraToWorld;
+	float4x4 _MainCameraProjection;
+	float4x4 _MainCameraInvProjection;
+};
+StructuredBuffer<CameraMatrixs> _CameraMatrixs;
+
+sampler2D _MainCameraOceanDepth;
+sampler2D _MainCameraOceanNormal;
+sampler2D _MainCameraSpecPre;
+float _SSRDistance;
+float _OceanHeight;
+RWTexture2D<float4> Result;
+RWTexture2D<float4> ResultDiff;
+
+inline float m_DecodeFloatRG(float4 rgba)
+{
+	// float encodeFactor = 255;
+	// float depth = (rg.r * encodeFactor + rg.g) / encodeFactor;
+	float depth = (rgba.r + (rgba.g / 128) + (rgba.b / 16384));
+	// float depth = (rgba.r + (rgba.g / 128));
+	return depth;
+}
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+	// TODO: insert actual code here!
+	//float4 depth = tex2Dlod(_MainCameraOceanDepth, float4(0,0,0,0));
+	float2 uv = id.xy;
+	uv /= 1024;
+	float Depth = m_DecodeFloatRG(tex2Dlod(_MainCameraOceanDepth, float4(uv, 0, 0)));
+	if (Depth >= 1)
+	{
+		Result[id.xy] = float4(0, 0, 0, 0);
+		ResultDiff[id.xy] = float4(0, 0, 0, 0);
+		return;
+	}
+	float2 NdcPos = uv * 2 - 1;
+	float3 ClipVec = float3(NdcPos.x, NdcPos.y, -1);
+	float3 ViewVec = mul(_CameraMatrixs[0]._MainCameraInvProjection, ClipVec.xyzz).xyz;
+	float3 ViewPos = ViewVec * _SSRDistance * Depth;
+
+	float3 specFinal = float3(0, 0, 0);
+	float3 DiffFinal = float3 (0, 0, 0);
+	for (int index = 0; index < _LightCount; index++) 
+	{
+		float3 viewLightPos = mul(_CameraMatrixs[0]._MainWorldToCamera, float4(_LightDataDataBuffer[index].position, 1)).xyz;
+		float distance = length(ViewPos - viewLightPos);
+		if (distance > _LightDataDataBuffer[index].distance) 
+		{
+			continue;
+		}
+		float3 viewForward = mul((float3x3)_CameraMatrixs[0]._MainWorldToCamera, _LightDataDataBuffer[index].forward);
+		float3 viewLightDir = normalize(viewLightPos - ViewPos);
+		float angleCos = dot(viewForward, -viewLightDir);
+		if (angleCos < _LightDataDataBuffer[index].angleCos)
+		{
+			continue;
+		}
+
+		float strenthRefl = 1 - (distance / (_LightDataDataBuffer[index].distance));
+		float3 specCache = tex2Dlod(_MainCameraSpecPre, float4(uv, 0, 0)).rgb;
+		float specCularScale = specCache.r;
+		float specSmoothness = specCache.g;
+		bool shouldDoubleSide = specCache.b > 0.1;
+
+		float3 viewViewDir = -normalize(ViewPos);
+		if (_CameraMatrixs[0]._MainCameraToWorld._m13 < _OceanHeight && shouldDoubleSide)
+		{
+			float3 worldViewDir = mul((float3x3)_CameraMatrixs[0]._MainCameraToWorld, viewViewDir);
+			worldViewDir.y *= -1;
+			viewViewDir = mul((float3x3)_CameraMatrixs[0]._MainWorldToCamera, worldViewDir);
+		}
+		float3 viewNormal = (tex2Dlod(_MainCameraOceanNormal, float4(uv, 0, 0)).xyz) * 2 - 1;
+
+		float3 viewHalfDir = normalize(viewLightDir + viewViewDir);
+		float spec = dot(viewNormal, viewHalfDir);
+		float specular = smoothstep(-specSmoothness, specSmoothness, spec+specCularScale-1);
+		specFinal += saturate(_LightDataDataBuffer[index].lightColor.rgb * specular * strenthRefl);
+
+		// float strenth = 1 - (distance / _LightDataDataBuffer[index].distance);
+		float angleClamp = smoothstep(_LightDataDataBuffer[index].angleCos, 1, angleCos) + 0.01;
+		float crossFade = smoothstep(0, _LightDataDataBuffer[index].angleCrossFade, angleClamp);
+		float diffValue = saturate(dot(viewNormal, viewLightDir));
+		DiffFinal += saturate(_LightDataDataBuffer[index].lightColor.rgb * strenthRefl * crossFade * (diffValue + _LightDataDataBuffer[index].ambientAmount));
+	}
+	specFinal = saturate(specFinal);
+	DiffFinal = saturate(DiffFinal);
+	Result[id.xy] = float4(specFinal, 1);
+	ResultDiff[id.xy] = float4(DiffFinal, 1);
+}

@@ -45,7 +45,7 @@
         sampler2D _MainCameraSSRMap;
         float4 _MainCameraSSRMap_TexelSize;
         sampler2D _MainCameraSSRTSpecMap;
-        float4 _MainCameraSSRTSpecMap_TexelSize;
+        sampler2D _MainCameraSSRTDiffMap;
 
         sampler2D _HeightMap;
         float4 _HeightMap_ST;
@@ -472,20 +472,19 @@
                 fixed diffValue = lerp(1 - _OceanDensity, 1, saturate(dot(bump, worldLightDir)));
                 // diffValue = lerp(0.5,1,diffValue);
                 fixed3 lightCompute = (_LightColor0 * diffValue + UNITY_LIGHTMODEL_AMBIENT);
-                fixed4 diffColor = isUnderWater ? _baseColor : _baseColor * fixed4(lightCompute, 1);
-                // return fixed4(lightCompute, 1);
-                refrCol = diffColor.rgb * densityIntersect + (1 - densityIntersect) * refrCol;
 
                 bool shouldSSR = i.depth * _ProjectionParams.z < _SSRDistance && _ProjectionParams.y == 0.3 && _ProjectionParams.z == _MainCameraFarClipPlane;
                 float3 reflDir = reflect(-worldViewDir, bump);
                 
                 fixed4 reflCol = fixed4(0,0,0,1);
                 fixed4 ssrtSpecCol = fixed4(0,0,0,1);
+                fixed4 ssrtDiffCol = fixed4(0,0,0,1);
 
                 #if _SSRENABLE_ON
                 if (shouldSSR)
                 {
 					ssrtSpecCol = tex2Dlod(_MainCameraSSRTSpecMap, float4(srcPosFrac, 0, 0));
+					ssrtDiffCol = tex2Dlod(_MainCameraSSRTDiffMap, float4(srcPosFrac, 0, 0));
 					// ssrtSpecCol = floor(ssrtSpecCol) / 128;
                     // ssrtSpecCol.a = 1;
 					reflCol = tex2DBlurLod(_MainCameraSSRMap, offsetSrcPosFrac, _MainCameraSSRMap_TexelSize, _SSRRoughness);
@@ -497,16 +496,21 @@
 					reflCol = texCubeBlur(_MainCameraReflProbe, reflDir, _MainCameraReflProbe_TexelSize.xy, _SSRRoughness);
 				}
                 #endif
+
+                fixed4 diffColor = isUnderWater ? _baseColor : _baseColor * fixed4(lightCompute, 1);
+                // return fixed4(lightCompute, 1);
+                refrCol = diffColor.rgb * densityIntersect + (1 - densityIntersect) * refrCol;
                 worldViewDir.y *= isUnderWater ? -1 : 1;
 				fixed3 worldHalfDir = normalize(worldLightDir + worldViewDir);
 				fixed spec = dot(bump, worldHalfDir);
                 // spec = isUnderWater ? -spec : spec;
 				fixed specular = lerp(0,1,smoothstep(-_SpecularSmoothness,_SpecularSmoothness,spec+_SpecularScale-1)) * step(0.001,_SpecularScale);
-                fixed4 specCol = _LightColor0 * specular + ssrtSpecCol;
+                fixed4 specCol = _LightColor0 * specular + ssrtSpecCol + ssrtDiffCol;
                 specCol *= (1 - underWaterIntersect * isUnderWater);
                 
                 // fixed4 reflCol = fixed4(1,1,1,1);
                 reflCol = isUnderWater ? diffColor : lerp(diffColor, reflCol, _ReflactAmount);
+                //reflCol += ssrtDiffCol * (1 - underWaterIntersect * isUnderWater);
                 // fixed3 refrReflColor = _LightColor0 * specular + reflCol.rgb * (1 - _RefractAmount) * lightCompute + refrCol * _RefractAmount;
                 fixed3 refrReflColor = specCol + lerp(reflCol.rgb, refrCol, _RefractAmount);
                 bubbleAlpha = max((bubbleAlpha - 0.2) * 1.25, intersect) * tex2Dlod(_BubbleMap, float4(i.uv1.xy,0,0)).r;

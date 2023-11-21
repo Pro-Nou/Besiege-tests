@@ -147,7 +147,7 @@
 			sampler2D _MainCameraSSRMap;
 			float4 _MainCameraSSRMap_TexelSize;
 			sampler2D _MainCameraSSRTSpecMap;
-			float4 _MainCameraSSRTSpecMap_TexelSize;
+			sampler2D _MainCameraSSRTDiffMap;
 
 			sampler2D _MainTex;
 			float4 _MainTex_ST;
@@ -348,10 +348,10 @@
 				// return fixed4(rcvShadow, 0, 0, 1);
 
                 diffValue = min(rcvShadow, saturate(diffValue));
-                fixed3 lightCompute = (_LightColor0 * diffValue);
-
+                float3 lightCompute = (_LightColor0 * diffValue);
 
 				fixed4 ssrtSpecCol = fixed4(0,0,0,1);
+				fixed4 ssrtDiffCol = fixed4(0,0,0,1);
                 fixed4 reflCol = fixed4(0,0,0,1);
 				fixed4 reflPonding = fixed4(0,0,0,1);
 
@@ -364,6 +364,8 @@
 					reflPonding = lerp(texCUBElod(_MainCameraReflProbe, float4(reflect(-worldViewDir, normalRain), 0)), reflPonding, reflPonding.a);
                    
 					ssrtSpecCol = tex2Dlod(_MainCameraSSRTSpecMap, float4(srcPosFrac, 0, 0));
+					ssrtDiffCol = tex2Dlod(_MainCameraSSRTDiffMap, float4(srcPosFrac, 0, 0));
+					ssrtDiffCol *= (1 - rainMetallic);
                     // ssrtSpecCol.a = 1;
 					reflCol = tex2DBlurLod(_MainCameraSSRMap, srcPosFrac, _MainCameraSSRMap_TexelSize, SSRRoughness);
                     // reflCol = lerp(texCUBElod(_MainCameraReflProbe, fixed4(reflDir, 0)), reflCol, reflCol.a);
@@ -384,15 +386,15 @@
 				fixed4 glow = rim * _RimColor * _LightColor0;
 				fixed4 final = col;
 				// final = lerp(final, lerp(col * reflCol, reflCol, _ReflactPower), _ReflactAmount);
-				final *= (1 - rainMetallic);
+				// final *= (1 - rainMetallic);
 				fixed4 finalAmbient = final;
-				final *= fixed4(lightCompute, 1);
+				final *= float4(lightCompute, 1);
 				// reflCol *= rainMetallic;
 				// fixed fresnel = (1 - _Smoothness) + (_Smoothness) * pow((1 - dot(-worldViewDir, worldNormal)), 5);
 				final = lerp(final, reflCol * col * (1 - rainClearCoatAmount), rainMetallic);
 				fixed4 specCol = _LightColor0 * specular + ssrtSpecCol;
 				fixed4 finalSpec = specCol * clearCoatSmoothness * (1 - rainClearCoatAmount) + specCol * rainClearCoatAmount;
-				final += emiss + glow + UNITY_LIGHTMODEL_AMBIENT * finalAmbient;
+				final += emiss + glow + UNITY_LIGHTMODEL_AMBIENT * finalAmbient + ssrtDiffCol;
 				final += rainClearCoatAmount * reflCol + finalSpec;
 				fixed4 pondingCol = reflPonding + specCol;
 				final = lerp(final, pondingCol, saturate(ponding * _PondingPower));

@@ -354,7 +354,7 @@
 				o.depth = float4(m_EncodeFloatRG(i.depth), 1);
 				// o.depth = float4(i.depth + 1, 0, 0, 1);
 				o.normal = float4((viewNormal + 1) / 2, 1);
-				o.specPre = float4(_SpecularScale, _SpecularSmoothness, 0, 1);
+				o.specPre = float4(_SpecularScale, _SpecularSmoothness, 1, 1);
 				return o;
 			}
 			ENDCG

@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine.Rendering;
@@ -10,6 +11,7 @@ public class postprocessmanager : MonoBehaviour {
 
 	public bool SSREnable;
 	public float SSRDistance;
+	public float reflProbeDistance;
 	[Range(-1f, 1f)]
 	public float SSRPixelBias;
 	[Range(-1f, 1f)]
@@ -27,16 +29,32 @@ public class postprocessmanager : MonoBehaviour {
 	public Texture2D SSRMask;
 	public float SSRMaskScale;
 
-	public struct LightData // 12 floats, 48 bytes
+	public struct LightData // 14 floats, 56 bytes
 	{
 		public Color lightColor;
 		public Vector3 position;
 		public Vector3 forward;
 		public float distance;
 		public float angleCos;
+		public float angleCrossFade;
+		public float ambientAmount;
 	}
-	public List<LightData> lightDatas;
+	public List<int> lightDataKeys;
+	public Dictionary<int, LightData> lightDatas;
 	public ComputeBuffer lightBuffer;
+
+	public struct cameraMatrixs // 4 matrix, 64 floats, 256 bytes
+	{
+		public Matrix4x4 _MainWorldToCamera;
+		public Matrix4x4 _MainCameraToWorld;
+		public Matrix4x4 _MainCameraProjection;
+		public Matrix4x4 _MainCameraInvProjection;
+	}
+	public cameraMatrixs[] cameraMatrixArray;
+	public ComputeBuffer cameraMatrixBuffer;
+
+	public ComputeShader ssrtCompute;
+	private int ssrtComputeId;
 
 	public float oceanHeight;
 	public float oceanDensity;
@@ -65,6 +83,7 @@ public class postprocessmanager : MonoBehaviour {
 	public RenderTexture ssrFinal;
 	public RenderTexture ssrtSpecPre;
 	public RenderTexture ssrtSpecFinal;
+	public RenderTexture ssrtDiffFinal;
 	public RenderTexture voronoiCache;
 	public RenderTexture voronoiNormal;
 	public ReflectionProbe reflProbe;
@@ -92,19 +111,14 @@ public class postprocessmanager : MonoBehaviour {
 	public bool thisBool;
 	private void Awake()
 	{
-		lightDatas = new List<LightData> ();
-		instance = this;
-		lightBuffer = new ComputeBuffer(128, 48);
+		lightDatas = new Dictionary<int, LightData> ();
+		lightDataKeys = new List<int> ();
+
+		//lightDatas = new List<LightData> ();
+		lightBuffer = new ComputeBuffer(256, 56);//256 lights, 56bytes per light
+		cameraMatrixArray = new cameraMatrixs[1];
+		cameraMatrixBuffer = new ComputeBuffer (1, 256);
 	} 
-	private void UpdateSSRT()
-	{
-		while (lightDatas.Count > 128) {
-			lightDatas.RemoveAt (0);
-		}
-		lightBuffer.SetData (lightDatas.ToArray());
-		blitMat.SetBuffer ("_LightDataDataBuffer", lightBuffer);
-		blitMat.SetFloat ("_LightCount", lightDatas.Count);
-	}
 	void resizeRT(ref RenderTexture rtIN, Vector2 Size)
 	{
 		rtIN.Release ();
@@ -154,6 +168,7 @@ public class postprocessmanager : MonoBehaviour {
 		//resizeRT (ref ssrFinal, new Vector2(Screen.width, Screen.height));
 		resizeRT (ref ssrFinal, new Vector2(1024f, 1024f));
 		resizeRT (ref ssrtSpecFinal, new Vector2(1024f, 1024f));
+		resizeRT (ref ssrtDiffFinal, new Vector2(1024f, 1024f));
 
 		RenderBuffer[] rb = new RenderBuffer[3];
 		rb [0] = ssrDepthCache.colorBuffer;
@@ -163,7 +178,8 @@ public class postprocessmanager : MonoBehaviour {
 	}
 	void UpdateAllValue()
 	{
-		reflProbe.nearClipPlane = SSRDistance;
+		reflProbe.nearClipPlane = reflProbeDistance;
+		reflProbe.farClipPlane = mainCamera.farClipPlane;
 		Shader.SetGlobalTexture ("_MainCameraReflProbe", reflProbe.texture);
 
 		oceanDepthNormalCamera.farClipPlane = SSRDistance;
@@ -174,6 +190,7 @@ public class postprocessmanager : MonoBehaviour {
 		Shader.SetGlobalTexture("_MainCameraSpecPre", ssrtSpecPre);
 		Shader.SetGlobalTexture("_MainCameraSSRMap", ssrFinal);
 		Shader.SetGlobalTexture("_MainCameraSSRTSpecMap", ssrtSpecFinal);
+		Shader.SetGlobalTexture("_MainCameraSSRTDiffMap", ssrtDiffFinal);
 
 		if (SSREnable) {
 			Shader.EnableKeyword ("_SSRENABLE_ON");
@@ -208,16 +225,69 @@ public class postprocessmanager : MonoBehaviour {
 		Shader.SetGlobalTexture ("_PondingWaveMap", pondingWaveMap);
 		Shader.SetGlobalVector ("_PondingUVTile", pondingUVTile);
 
+		InitSSRTCompute ();
+
 		blitMat.SetTexture ("_VoronoiMap", voronoiCache);
 		Shader.SetGlobalTexture("_VoronoiNormal", voronoiNormal);
 		Vector3 oldPos = oceanObject.transform.position;
 		oldPos.y = oceanHeight;
 		oceanObject.transform.position = oldPos;
+
+	}
+	public void AddSSRTCaster(int key, LightData value){
+		lightDatas.Add (key, value);
+		lightDataKeys.Add (key);
+	}
+	public void RemoveSSRTCaster(int key){
+		if (lightDatas.ContainsKey (key)) {
+			lightDatas.Remove (key);
+			lightDataKeys.Remove (key);
+		}
+	}
+	public void TransformSSRTCaster(int key, LightData value){
+		if (lightDatas.ContainsKey (key)) {
+			lightDatas [key] = value;
+		}
+	}
+	public void InitSSRTCompute() {
+		ssrtSpecFinal.Release ();
+		ssrtSpecFinal.enableRandomWrite = true;
+		ssrtSpecFinal.Create ();
+		ssrtDiffFinal.Release ();
+		ssrtDiffFinal.enableRandomWrite = true;
+		ssrtDiffFinal.Create ();
+		ssrtComputeId = ssrtCompute.FindKernel("CSMain");
+		ssrtCompute.SetTexture(ssrtComputeId, "Result", ssrtSpecFinal);
+		ssrtCompute.SetTexture(ssrtComputeId, "ResultDiff", ssrtDiffFinal);
+		ssrtCompute.SetTexture(ssrtComputeId, "_MainCameraOceanDepth", ssrDepthCache);
+		ssrtCompute.SetTexture(ssrtComputeId, "_MainCameraOceanNormal", ssrNormalCache);
+		ssrtCompute.SetTexture(ssrtComputeId, "_MainCameraSpecPre", ssrtSpecPre);
+		ssrtCompute.SetFloat("_SSRDistance", SSRDistance);
+		ssrtCompute.SetFloat("_OceanHeight", oceanHeight);
+	}
+	private void UpdateSSRT()
+	{
+		Debug.Log (lightDataKeys.Count);
+		while (lightDataKeys.Count > 256) {
+			RemoveSSRTCaster(lightDataKeys [0]);
+		}
+		LightData[] lightDataArray = new LightData[lightDatas.Count];
+		lightDatas.Values.CopyTo (lightDataArray, 0);
+		lightBuffer.SetData (lightDataArray);
+		ssrtCompute.SetBuffer (ssrtComputeId, "_LightDataDataBuffer", lightBuffer);
+		ssrtCompute.SetFloat ("_LightCount", lightDatas.Count);
+		cameraMatrixArray [0]._MainCameraInvProjection = mainCamera.projectionMatrix.inverse;
+		cameraMatrixArray [0]._MainCameraProjection = mainCamera.projectionMatrix;
+		cameraMatrixArray [0]._MainCameraToWorld = mainCamera.transform.localToWorldMatrix;
+		cameraMatrixArray [0]._MainWorldToCamera = mainCamera.transform.worldToLocalMatrix;
+		cameraMatrixBuffer.SetData (cameraMatrixArray);
+		ssrtCompute.SetBuffer (ssrtComputeId, "_CameraMatrixs", cameraMatrixBuffer);
+		//blitMat.SetBuffer ("_LightDataDataBuffer", lightBuffer);
+		//blitMat.SetFloat ("_LightCount", lightDatas.Count);
 	}
 	// Use this for initialization
 	void Start () {
 		thisBool = false;
-
 
 		ssrFinal.Release ();
 		ssrFinal.useMipMap = true;
@@ -261,6 +331,8 @@ public class postprocessmanager : MonoBehaviour {
 		beforeAlpha.Blit (rt, rt1);
 		//beforeAlpha.Blit (rt1, rt3, blitMat, 1);
 		mainCamera.AddCommandBuffer (CameraEvent.AfterForwardAlpha, beforeAlpha);
+
+		instance = this;
 		//mainCamera.AddCommandBuffer (CameraEvent.BeforeGBuffer, beforeGbuffer);
 		//oceanDepthNormalCamera.AddCommandBuffer (CameraEvent.AfterForwardOpaque, ssrLastFramOffset);
 		//mainCamera.AddCommandBuffer (CameraEvent.AfterForwardOpaque, beforeAlpha);
@@ -287,7 +359,7 @@ public class postprocessmanager : MonoBehaviour {
 		blitMat.SetMatrix ("_MainWorldToCamera", mainCamera.transform.worldToLocalMatrix);
 		if (SSREnable) {
 			Graphics.Blit (rgbaResult, ssrFinal, blitMat, 1);
-			Graphics.Blit (rgbaResult, ssrtSpecFinal, blitMat, 6);
+			ssrtCompute.Dispatch(ssrtComputeId, 1024 / 8, 1024 / 8, 1);
 		}
 
 		if (rainVisibility > 0.2) {
@@ -339,6 +411,8 @@ public class postprocessmanager : MonoBehaviour {
 	{
 		lightBuffer.Release();
 		lightBuffer = null;
+		cameraMatrixBuffer.Release ();
+		cameraMatrixBuffer = null;
 	}
 	// void OnRenderImage(RenderTexture source, RenderTexture destination)
 	// {

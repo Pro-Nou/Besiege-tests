@@ -148,7 +148,7 @@
 			sampler2D _MainCameraSSRMap;
 			float4 _MainCameraSSRMap_TexelSize;
 			sampler2D _MainCameraSSRTSpecMap;
-			float4 _MainCameraSSRTSpecMap_TexelSize;
+			sampler2D _MainCameraSSRTDiffMap;
 
 			sampler2D _MainTex;
 			float4 _MainTex_ST;
@@ -336,6 +336,8 @@
                 if (shouldSSR)
                 {
 					ssrtSpecCol = tex2Dlod(_MainCameraSSRTSpecMap, float4(srcPosFrac, 0, 0));
+					ssrtDiffCol = tex2Dlod(_MainCameraSSRTDiffMap, float4(srcPosFrac, 0, 0));
+					ssrtDiffCol *= (1 - _Metallic);
                     // ssrtSpecCol.a = 1;
 					// reflClearCoat = tex2Dlod(_MainCameraSSRMap, float4(srcPosFrac, 0, 0));
 					reflCol = tex2DBlurLod(_MainCameraSSRMap, srcPosFrac, _MainCameraSSRMap_TexelSize, SSRRoughness);
@@ -371,7 +373,7 @@
 				final = lerp(final, reflCol * col * (1 - rainClearCoatAmount), _Metallic);
 				fixed4 specCol = _LightColor0 * specular + ssrtSpecCol;
 				fixed4 finalSpec = specCol * clearCoatSmoothness * (1 - rainClearCoatAmount) + specCol * rainClearCoatAmount;
-				final += emiss + glow + UNITY_LIGHTMODEL_AMBIENT * finalAmbient;
+				final += emiss + glow + UNITY_LIGHTMODEL_AMBIENT * finalAmbient + ssrtDiffCol;
 				final += rainClearCoatAmount * reflCol + finalSpec;
 				// fixed4 clearCoat = rainClearCoatAmount * (reflClearCoat + _LightColor0 * specularClearCoat);
 				// apply fog

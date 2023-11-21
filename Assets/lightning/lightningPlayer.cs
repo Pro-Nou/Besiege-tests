@@ -12,6 +12,8 @@ public class lightningPlayer : MonoBehaviour {
 	private Material lightningAnchorMat;
 	public GameObject lightningAnchor;
 
+	public SSRTcaster ssrtCaster;
+
 	public ParticleSystem hitPS0;
 	public ParticleSystem hitPS1;
 	public ParticleSystem hitPS2;
@@ -61,6 +63,8 @@ public class lightningPlayer : MonoBehaviour {
 		PSR2.material.SetColor ("_Color", color);
 		PSR2.material.SetColor ("_ColorInside", colorInside);
 		PSR2.material.SetFloat ("_ColorMult", colorMult);
+
+		ssrtCaster.lightColor = color;
 	}
 	void Awake () {
 		isPlaying = false;
@@ -84,6 +88,7 @@ public class lightningPlayer : MonoBehaviour {
 		hitPS2.Stop ();
 		lightningMat.SetFloat ("_Progress", 0);
 		lightningAnchorMat.SetFloat ("_Progress", 0);
+		ssrtCaster.enabled = false;
 	}
 	void Playing () {
 
@@ -97,6 +102,7 @@ public class lightningPlayer : MonoBehaviour {
 		lightningMain.transform.localScale = new Vector3 (progressScale, 3f, progressScale);
 		lightningMat.SetFloat ("_Progress", progress);
 		lightningAnchorMat.SetFloat ("_Progress", progress);
+		ssrtCaster.lightData.distance = 32f * Mathf.Max(0f, 0.8f - progress);
 	}
 	// Update is called once per frame
 	void Update () {
