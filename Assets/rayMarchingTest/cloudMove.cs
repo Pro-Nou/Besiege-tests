@@ -16,9 +16,16 @@ public class cloudMove : MonoBehaviour {
 	void Start () {
 		//Debug.Log (this.transform.position);
 	}
+	public void oceanHeightFix(float oceanHeight) {
+		if (CloudHeight < oceanHeight) {
+			cloudOffsetVec4.y = (oceanHeight / _meshFilter.gameObject.transform.localScale.y) + _mat.GetFloat ("_heightCullThreshold");
+			CloudHeight = oceanHeight;
+		}
+	}
 	void OnEnable() {
 		cloudOffsetVec4 = _mat.GetVector ("_positionOffset");
 		CloudHeight = (cloudOffsetVec4.y - _mat.GetFloat ("_heightCullThreshold")) * _meshFilter.gameObject.transform.localScale.y;
+		oceanHeightFix (3f);
 		Debug.Log ("cloud height: " + CloudHeight.ToString());
 		Shader.SetGlobalFloat ("_CloudHeight", CloudHeight);
 		/*

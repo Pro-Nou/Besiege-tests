@@ -141,7 +141,7 @@
 				float depth : DEPTH;
 			};
 
-			
+			sampler2D _CameraDepthTexture;
 			samplerCUBE _MainCameraReflProbe;
 			float4 _MainCameraReflProbe_TexelSize;
 			sampler2D _MainCameraSSRMap;
@@ -321,6 +321,9 @@
                 float2 offset = bump.xy * 100 * _MainCameraSSRMap_TexelSize.xy;
                 float4 offsetScrPos = float4(offset * i.scrPos.z + i.scrPos.xy, i.scrPos.zw);
                 float2 srcPosFrac = offsetScrPos.xy / offsetScrPos.w;
+                float screenDepth = Linear01Depth(tex2Dlod(_CameraDepthTexture, float4(srcPosFrac, 0, 0)).r);
+				srcPosFrac = screenDepth <= i.depth ? i.scrPos.xy / i.scrPos.w : srcPosFrac;
+
 				bump = normalize(half3(dot(i.TtoW0.xyz, bump), dot(i.TtoW1.xyz, bump), dot(i.TtoW2.xyz, bump)));
 				
                 fixed3 worldViewDir = normalize(UnityWorldSpaceViewDir(worldPos));

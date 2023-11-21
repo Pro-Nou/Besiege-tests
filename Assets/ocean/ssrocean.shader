@@ -279,7 +279,7 @@
         // We must be transparent, so other objects are drawn before this one.
         Tags
         {
-            "RenderType"="Ocean" "Queue"="transparent-1" "LightMode" = "ForwardBase" "PerformanceChecks"="False"
+            "RenderType"="Ocean" "Queue"="transparent-1" "LightMode" = "ForwardBase" "PerformanceChecks"="False" "DisableBatching"="true"
         }
         	ZWrite on
             Cull off
@@ -439,22 +439,28 @@
                 bump.z = sqrt(1.0 - saturate(dot(bump.xy, bump.xy)));
                 float2 offset = bump.xy * _Distortion * 10 * _RefractionTex_TexelSize.xy * i.scrPos.z;
                 float2 offsetSrcPosFrac = (offset.xy + i.scrPos.xy) / i.scrPos.w;
-                float2 reflScrPosFrac = srcPosFrac;
-                float2 reflOffsetScrPosFrac = offsetSrcPosFrac;
-
-				// #if UNITY_UV_STARTS_AT_TOP 
-                // if (_RefractionTex_TexelSize.y < 0) 
-                reflScrPosFrac.y = _invY ? 1 - reflScrPosFrac.y : reflScrPosFrac.y;
-                reflOffsetScrPosFrac.y = _invY ? 1 - reflOffsetScrPosFrac.y : reflOffsetScrPosFrac.y;
-                // #endif
-                fixed3 refrCol = tex2Dlod(_RefractionTex, float4(reflOffsetScrPosFrac, 0, 0)).rgb;
-                // fixed3 refrCol = tex2Dlod(_RefractionTex, fixed4(srcPosFrac, 0, 0)).rgb;
-                fixed3 refrColOrg = tex2Dlod(_RefractionTex, float4(reflScrPosFrac, 0, 0)).rgb;
 
                 float screenDepth = Linear01Depth(tex2Dlod(_CameraDepthTexture, float4(offsetSrcPosFrac, 0, 0)).r);
                 float diff = screenDepth - i.depth;
                 float intersect = 1 - smoothstep(0, _ProjectionParams.w * _EdgeScale, diff);
-                refrCol = lerp(refrCol, refrColOrg, intersect);
+                offsetSrcPosFrac = screenDepth <= i.depth ? srcPosFrac : offsetSrcPosFrac;
+                // if (screenDepth < i.depth) {
+                    // offsetSrcPosFrac = srcPosFrac;
+                // }
+                // return fixed4(screenDepth <= i.depth, 0, 0, 1);
+                // float2 reflScrPosFrac = srcPosFrac;
+                // float2 reflOffsetScrPosFrac = offsetSrcPosFrac;
+
+				// #if UNITY_UV_STARTS_AT_TOP 
+                // if (_RefractionTex_TexelSize.y < 0) 
+                // reflScrPosFrac.y = _invY ? 1 - reflScrPosFrac.y : reflScrPosFrac.y;
+                // reflOffsetScrPosFrac.y = _invY ? 1 - reflOffsetScrPosFrac.y : reflOffsetScrPosFrac.y;
+                // #endif
+                fixed3 refrCol = tex2Dlod(_RefractionTex, float4(offsetSrcPosFrac, 0, 0)).rgb;
+                // fixed3 refrCol = tex2Dlod(_RefractionTex, fixed4(srcPosFrac, 0, 0)).rgb;
+                //fixed3 refrColOrg = tex2Dlod(_RefractionTex, float4(reflScrPosFrac, 0, 0)).rgb;
+
+                //refrCol = lerp(refrCol, refrColOrg, intersect);
 
                 float screenDepthNoLinear = tex2Dlod(_CameraDepthTexture, float4(srcPosFrac, 0, 0)).r;
                 float screenDepthOrg = Linear01Depth(screenDepthNoLinear);
@@ -483,8 +489,9 @@
                 #if _SSRENABLE_ON
                 if (shouldSSR)
                 {
-					ssrtSpecCol = tex2Dlod(_MainCameraSSRTSpecMap, float4(srcPosFrac, 0, 0));
-					ssrtDiffCol = tex2Dlod(_MainCameraSSRTDiffMap, float4(srcPosFrac, 0, 0));
+					ssrtSpecCol = tex2Dlod(_MainCameraSSRTSpecMap, float4(offsetSrcPosFrac, 0, 0));
+					ssrtDiffCol = tex2Dlod(_MainCameraSSRTDiffMap, float4(offsetSrcPosFrac, 0, 0));
+                    // ssrtDiffCol = screenDepth < i.depth ? tex2Dlod(_MainCameraSSRTDiffMap, float4(srcPosFrac, 0, 0)) : ssrtDiffCol;
 					// ssrtSpecCol = floor(ssrtSpecCol) / 128;
                     // ssrtSpecCol.a = 1;
 					reflCol = tex2DBlurLod(_MainCameraSSRMap, offsetSrcPosFrac, _MainCameraSSRMap_TexelSize, _SSRRoughness);

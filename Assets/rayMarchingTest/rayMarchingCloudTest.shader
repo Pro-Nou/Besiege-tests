@@ -33,14 +33,19 @@
     //[NoScaleOffset]_CloudLightMap ("CloudLightMap", 2D) = "white" {}
   }
   SubShader{
-    Tags { "Queue" = "transparent-1" "RenderType" = "volum" "LightMode" = "ForwardBase" "PerformanceChecks"="False" }
+    Tags { "Queue" = "transparent-2" "RenderType" = "volum" "LightMode" = "ForwardBase" "PerformanceChecks"="False" }
     Blend SrcAlpha OneMinusSrcAlpha
     ZWrite on
 	  ZTest less
 	  Cull off
     LOD 100
 
-    Pass{
+	// GrabPass
+	// {
+	// 	"_RefractionTex"
+	// }
+    Pass
+	{
       CGPROGRAM
       #pragma vertex vert
       #pragma fragment frag
@@ -52,6 +57,7 @@
       #define EPSILON 0.500001f
       #define poseOffset3D float3(_positionOffset.x,0,_positionOffset.z) * _positionOffset.w
       sampler2D _CameraDepthTexture;
+	sampler2D _RefractionTex;
 
       struct appdata{
         float4 vertex : POSITION;
@@ -109,7 +115,7 @@
       float _StepScaleDis;
       int _max_count;
       float _heightCullThreshold;
-	  float _OceanHeight;
+	//   float _OceanHeight;
 
       float _LightStepSize;
       int _light_max_count;
@@ -149,8 +155,7 @@
         float3 rayDirection = normalize(rayOrigin - i.localCameraPos);
         rayOrigin = i.localCameraPos;
 
-      	float blueNoiseOffset = tex2Dlod(_RayMaskTex, float4((_ScreenParams.xy / 256) * (i.scrPos.xy / i.scrPos.w),0,0)).r
-      							+tex2Dlod(_RayMaskTex, float4((_ScreenParams.xy / 128) * (i.scrPos.xy / i.scrPos.w),0,0)).r;
+      	float blueNoiseOffset = tex2Dlod(_RayMaskTex, float4((_ScreenParams.xy / 128) * (i.scrPos.xy / i.scrPos.w),0,0)).r;
         float rayLength = blueNoiseOffset * _BlueNoiseScale;
 
 
@@ -182,15 +187,15 @@
         bool isHit = false;
         float3 hittedPos = float3(0,0,0);
 
-		if (_ProjectionParams.y < 128)
-		{
-			float oceanHeight = _OceanHeight / 2000 - _positionOffset.y;
-			if ((rayOrigin.y - oceanHeight) / rayDirection.y < 0)
-			{
-				maxRayLength = min(maxRayLength, -(rayOrigin.y - oceanHeight) / rayDirection.y);
-			}
-			maxRayLength *= (rayOrigin.y > oceanHeight);
-		}
+		// if (_ProjectionParams.y < 128)
+		// {
+		// 	float oceanHeight = _OceanHeight / 2000 - _positionOffset.y;
+		// 	if ((rayOrigin.y - oceanHeight) / rayDirection.y < 0)
+		// 	{
+		// 		maxRayLength = min(maxRayLength, -(rayOrigin.y - oceanHeight) / rayDirection.y);
+		// 	}
+		// 	maxRayLength *= (rayOrigin.y > oceanHeight);
+		// }
 		// maxRayLength = min(maxRayLength, -(rayOrigin.y - oceanHeight) / rayDirection.y);
 		// rayOrigin.y + rayLength * rayDirection.y > oceanHeight
         //[unroll(64)]
@@ -336,11 +341,16 @@
 		// UNITY_OUTPUT_DEPTH(i.depth_2);
 		f2o finaloutput;
         float lightCalculate = saturate(lightDepth / (_light_max_count * max(1, depthCount)) * _light_damper);
-        if(_ColorMappingMode == 0)
-      		finaloutput.col = fixed4(lerp(_baseColor.rgb,_backColor.rgb, lightCalculate) * _LightColor0.rgb.rgb + UNITY_LIGHTMODEL_AMBIENT, saturate(cloudDensity));
-      	else
-      		finaloutput.col = fixed4(tex2Dlod(_ColorMap, float4(lightCalculate,0.5,0,0)).rgb * _LightColor0.rgb.rgb + UNITY_LIGHTMODEL_AMBIENT, saturate(cloudDensity));
-      	//return color;
+        // if(_ColorMappingMode == 0)
+      	// 	finaloutput.col = fixed4(lerp(_baseColor.rgb,_backColor.rgb, lightCalculate) * _LightColor0.rgb.rgb + UNITY_LIGHTMODEL_AMBIENT, saturate(cloudDensity));
+      	// else
+      	// 	finaloutput.col = fixed4(tex2Dlod(_ColorMap, float4(lightCalculate,0.5,0,0)).rgb * _LightColor0.rgb.rgb + UNITY_LIGHTMODEL_AMBIENT, saturate(cloudDensity));
+      	fixed3 final = (_ColorMappingMode == 0) ? lerp(_baseColor.rgb,_backColor.rgb, lightCalculate) : tex2Dlod(_ColorMap, float4(lightCalculate,0.5,0,0)).rgb;
+		final *= _LightColor0.rgb;
+		final += UNITY_LIGHTMODEL_AMBIENT;
+		// final = lerp(tex2Dproj(_RefractionTex, UNITY_PROJ_COORD(i.scrPos)).rgb, final, saturate(cloudDensity));
+		finaloutput.col = fixed4(final, saturate(cloudDensity));
+		//return color;
 
       	// float3 worldPos = mul(unity_ObjectToWorld, float4(hittedPos, 1)).xyz;
 		hittedPos.y += _positionOffset.y;

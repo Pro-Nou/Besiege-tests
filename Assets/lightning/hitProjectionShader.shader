@@ -10,7 +10,7 @@
 	}
 	SubShader
 	{
-		Tags { "RenderType"="transparent" "Queue"="geometry+1" "LightMode"="ForwardBase" "disablepatching"="true"}
+		Tags { "RenderType"="transparent" "Queue"="geometry+1" "LightMode"="ForwardBase" "DisableBatching"="true"}
 		ztest off
 		zwrite off
 		cull front

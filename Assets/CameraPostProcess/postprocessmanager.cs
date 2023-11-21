@@ -56,6 +56,7 @@ public class postprocessmanager : MonoBehaviour {
 	public ComputeShader ssrtCompute;
 	private int ssrtComputeId;
 
+	public cloudMove cloudmove;
 	public float oceanHeight;
 	public float oceanDensity;
 	public float oceanUnderWaterVisiableDistance;
@@ -232,6 +233,7 @@ public class postprocessmanager : MonoBehaviour {
 		Vector3 oldPos = oceanObject.transform.position;
 		oldPos.y = oceanHeight;
 		oceanObject.transform.position = oldPos;
+		cloudmove.oceanHeightFix (oceanHeight);
 
 	}
 	public void AddSSRTCaster(int key, LightData value){

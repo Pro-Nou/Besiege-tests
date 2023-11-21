@@ -231,7 +231,7 @@
                 float thisScrDepth = depth;
                 float thisDepth = depth;
                 // float SSRlength0 = length(worldPos - _WorldSpaceCameraPos.xyz);
-				float SSRlength0 = length(viewPos);
+				// float SSRlength0 = length(viewPos);
                 // float SSRlength0 = length(i.worldPos - _WorldSpaceCameraPos.xyz);
 				float pixelBias = _SSRPixelBias / _SSRDistance;
 				float pixelThickness = _SSRPixelThickness / _SSRDistance;
@@ -250,7 +250,7 @@
                 	// float3 viewVec0 = mul(unity_CameraInvProjection, clipVec0.xyzz).xyz;
                 	float3 viewVec0 = mul(_MainCameraInvProjection, clipVec0.xyzz).xyz * _SSRDistance;
 					float3 viewPos1 = getCross(viewPos, reflViewDir, float3(0, 0, 0), viewVec0);
-                	float SSRlength1 = length(viewPos1 - viewPos) + SSRlength0;
+                	// float SSRlength1 = length(viewPos1 - viewPos) + SSRlength0;
                 	float depth0 = viewPos1 / viewVec0;
                 	if (depth0 < 0 || depth0 > 1)
                 	{
@@ -261,7 +261,7 @@
 					float screenDepth0 = m_DecodeFloatRG(tex2Dlod(_MainCameraOceanDepth, float4(reflSamplePos, 0, reflLod)));
 					// float screenDepth0 = (tex2Dlod(_MainCameraOceanDepth, float4(reflSamplePos, 0, 0)).x - 1) / _SSRDistance;
 
-                	if (screenDepth0 + SSRlength1 * pixelBias * 0.01 < depth0 && depth0 < screenDepth0 + max(abs(lastDepth - depth0), pixelThickness))
+                	if (screenDepth0 + pixelBias * 0.01 < depth0 && depth0 < screenDepth0 + max(abs(lastDepth - depth0), pixelThickness))
                 	{
                 		reflValid = (reflLod == 0);
                 		thisScrDepth = screenDepth0;
