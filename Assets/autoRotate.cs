@@ -7,6 +7,7 @@ public class autoRotate : MonoBehaviour {
 
 	// Use this for initialization
 	public float speed;
+	public float speed2;
 	void Start () {
 		//Light mainLight = GetComponent<Light> ();
 		//mainLight.shadowCustomResolution = 80000;
@@ -18,6 +19,7 @@ public class autoRotate : MonoBehaviour {
 	private void Update () {
 
 		this.transform.RotateAround (this.transform.position, new Vector3 (0, 1, 0), Time.deltaTime * speed);
+		this.transform.position += (this.transform.right * Time.deltaTime * speed2);
 		//Debug.Log(transform.localRotation.eulerAngles);
 	}
 }

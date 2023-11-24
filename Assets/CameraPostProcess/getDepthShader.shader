@@ -16,10 +16,8 @@
 	}
 	inline float m_DecodeFloatRG(float4 rgba)
 	{
-		// float encodeFactor = 255;
-		// float depth = (rg.r * encodeFactor + rg.g) / encodeFactor;
-		float depth = (rgba.r + (rgba.g / 128) + (rgba.b / 16384));
-		// float depth = (rgba.r + (rgba.g / 128));
+		// float depth = (rgba.r + (rgba.g / 128) + (rgba.b / 16384));
+		float depth = rgba.r;
 		return depth;
 	}
 	inline float2 m_EncodeFloatRG(float depth)
@@ -213,8 +211,8 @@
 				
 				// return float4(srcReflDir, 0, 1);
 
-				// srcReflDir.x += abs(srcReflDir.x) < 0.0001 ? 0.0001 : 0;
-				// srcReflDir.y += abs(srcReflDir.y) < 0.0001 ? 0.0001 : 0;
+				srcReflDir.x += abs(srcReflDir.x) < 0.0001 ? 0.0001 : 0;
+				srcReflDir.y += abs(srcReflDir.y) < 0.0001 ? 0.0001 : 0;
 				// srcReflDir.x += abs(srcReflDir.x) < 0.0001 ? 0.0001 : 0;
 				// srcReflDir += SSROffset.xy * _SSRMaskScale;
 

@@ -8,6 +8,7 @@ public class AnimatorTest : MonoBehaviour {
 	public bool moveRight;
 	public bool moveFront;
 	public bool moveBack;
+	public float speed;
 	// Use this for initialization
 	void Start () {
 
@@ -73,9 +74,9 @@ public class AnimatorTest : MonoBehaviour {
 		}
 
 		if (moveFront)
-			transform.Translate (new Vector3 (0f, 0f, 2.2f * Time.deltaTime));
+			transform.Translate (new Vector3 (0f, 0f, 2.2f * Time.deltaTime * speed));
 		if (moveBack)
-			transform.Translate (new Vector3 (0f, 0f, -2.2f * Time.deltaTime));
+			transform.Translate (new Vector3 (0f, 0f, -2.2f * Time.deltaTime * speed));
 		if(moveLeft)
 			transform.Rotate (new Vector3(0f,-360f*Time.deltaTime,0f));
 		if(moveRight)

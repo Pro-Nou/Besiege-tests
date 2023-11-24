@@ -11,29 +11,21 @@
 		// return enc;
 		return ((n + 1) / 2).xy;
 	}
-	inline float3 m_EncodeFloatRG(float depth)
+	inline float m_EncodeFloatRG(float depth)
 	{
-		// float encodeFactor = 255;
-		// float depth255 = depth * encodeFactor;
-		// float depthMod = depth255 % 1;
-		// float2 rg = float2((depth255 - depthMod) / encodeFactor, depthMod);
-		float encodeFactor = 128;
+		// float encodeFactor = 128;
 
-		float depthMod0 = (depth * encodeFactor); 
-		float depthMod1 = depthMod0 % 1;
-		depthMod0 -= depthMod1;
-		depthMod0 /= encodeFactor;
+		// float depthMod0 = (depth * encodeFactor); 
+		// float depthMod1 = depthMod0 % 1;
+		// depthMod0 -= depthMod1;
+		// depthMod0 /= encodeFactor;
 
-		depthMod1 *= encodeFactor;
-		float depthMod2 = depthMod1 % 1;
-		depthMod1 -= depthMod2;
-		depthMod1 /= encodeFactor;
-
-		// depthMod2 = depthMod2 / encodeFactor;
-		// depthMod2 = 0;
-		// float depthMod2 = 0;
-		float3 rgb = float3(depthMod0, depthMod1, depthMod2);
-		return rgb;
+		// depthMod1 *= encodeFactor;
+		// float depthMod2 = depthMod1 % 1;
+		// depthMod1 -= depthMod2;
+		// depthMod1 /= encodeFactor;
+		// float3 rgb = float3(depthMod0, depthMod1, depthMod2);
+		return depth;
 	}
 	ENDCG
 	SubShader
@@ -110,7 +102,7 @@
 
 				finalOutPut o;
 				// o.depth = float4(EncodeFloatRG(i.depth),  0, 1);
-				o.depth = float4(m_EncodeFloatRG(i.depth), 1);
+				o.depth = float4(m_EncodeFloatRG(i.depth), 0, 0, 1);
 				// o.depth = float4(i.depth + 1, 0, 0, 1);
 				o.normal = float4((viewNormal + 1) / 2, 1);
 				
@@ -351,7 +343,7 @@
 				// viewNormal.z *= -1;
 				finalOutPut o;
 				// o.depth = float4(EncodeFloatRG(i.depth), 0, 1);
-				o.depth = float4(m_EncodeFloatRG(i.depth), 1);
+				o.depth = float4(m_EncodeFloatRG(i.depth), 0, 0, 1);
 				// o.depth = float4(i.depth + 1, 0, 0, 1);
 				o.normal = float4((viewNormal + 1) / 2, 1);
 				o.specPre = float4(_SpecularScale, _SpecularSmoothness, 1, 1);

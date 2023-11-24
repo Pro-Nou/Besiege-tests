@@ -162,14 +162,15 @@ public class postprocessmanager : MonoBehaviour {
 		float ssrtResDec = Mathf.Pow (2, SSRTResDecrease);
 		resizeRT (ref rgbaResult, new Vector2(Screen.width, Screen.height));
 		resizeRT (ref rgbaFinal, new Vector2(Screen.width, Screen.height));
-		resizeRT (ref ssrDepthCache, new Vector2(Screen.width / ssrResDec, Screen.height / ssrResDec));
-		resizeRT (ref ssrNormalCache, new Vector2(Screen.width / ssrResDec, Screen.height / ssrResDec));
-		resizeRT (ref ssrtSpecPre, new Vector2(Screen.width / ssrtResDec, Screen.height / ssrtResDec));
+		resizeRT (ref ssrDepthCache, new Vector2(Screen.width, Screen.height));
+		resizeRT (ref ssrNormalCache, new Vector2(Screen.width, Screen.height));
+		resizeRT (ref ssrtSpecPre, new Vector2(Screen.width, Screen.height));
 		//resizeRT (ref ssrtSpecPre, new Vector2(Screen.width / ssrtResDec, Screen.height / ssrtResDec));
 		//resizeRT (ref ssrFinal, new Vector2(Screen.width, Screen.height));
-		resizeRT (ref ssrFinal, new Vector2(1024f, 1024f));
-		resizeRT (ref ssrtSpecFinal, new Vector2(1024f, 1024f));
-		resizeRT (ref ssrtDiffFinal, new Vector2(1024f, 1024f));
+		resizeRT (ref ssrFinal, new Vector2(1024f / ssrResDec, 1024f / ssrResDec));
+		resizeRT (ref ssrtSpecFinal, new Vector2(1024f / ssrtResDec, 1024f / ssrtResDec));
+		resizeRT (ref ssrtDiffFinal, new Vector2(1024f / ssrtResDec, 1024f / ssrtResDec));
+		ssrtCompute.SetFloat("_ResultResolution", 1024f / ssrtResDec);
 
 		RenderBuffer[] rb = new RenderBuffer[3];
 		rb [0] = ssrDepthCache.colorBuffer;
@@ -318,12 +319,12 @@ public class postprocessmanager : MonoBehaviour {
 
 
 		//resizeHiZ ();
-		resizeOnce ();
 
 		//oceanDepthNormalCamera.targetTexture = oceanDepthResult;
 		//ssrCamera.enabled = false;
 
 		UpdateAllValue ();
+		resizeOnce ();
 		//ssrLastFramOffset = new CommandBuffer ();
 		beforeAlpha = new CommandBuffer ();
 		rt = new RenderTargetIdentifier(mainCamera.targetTexture);
@@ -340,13 +341,27 @@ public class postprocessmanager : MonoBehaviour {
 		//mainCamera.AddCommandBuffer (CameraEvent.AfterForwardOpaque, beforeAlpha);
 
 	}
-	// Update is called once per frame
-	void Update () {
-
+	void PreRenderUpdate() {
 		blitMat.SetMatrix ("_MainCameraToWorld", mainCamera.transform.localToWorldMatrix);
 		blitMat.SetMatrix ("_MainCameraProjection", mainCamera.projectionMatrix);
 		blitMat.SetMatrix ("_MainCameraInvProjection", mainCamera.projectionMatrix.inverse);
-		UpdateSSRT ();
+
+
+		Graphics.Blit (rgbaResult, rgbaFinal, blitMat, 2);
+		blitMat.SetMatrix ("_MainWorldToCamera", mainCamera.transform.worldToLocalMatrix);
+		if (SSREnable) {
+			UpdateSSRT ();
+			//ssrtCompute.Dispatch(ssrtComputeId, ssrtSpecFinal.width / 8, ssrtSpecFinal.height / 8, 1);
+			//Graphics.Blit (rgbaResult, ssrFinal, blitMat, 1);
+		}
+
+		if (rainVisibility > 0.2) {
+			Graphics.Blit (voronoiCache, voronoiCache, blitMat, 4);
+		}
+		Graphics.Blit (voronoiCache, voronoiNormal, blitMat, 5);
+	}
+	// Update is called once per frame
+	void Update () {
 
 
 		if (mainCamera.fieldOfView != oceanDepthNormalCamera.fieldOfView) {
@@ -355,19 +370,7 @@ public class postprocessmanager : MonoBehaviour {
 		if (Screen.height != rgbaResult.height || Screen.width != rgbaResult.width) {
 			resizeOnce ();
 		}
-		oceanDepthNormalCamera.Render ();
 
-		Graphics.Blit (rgbaResult, rgbaFinal, blitMat, 2);
-		blitMat.SetMatrix ("_MainWorldToCamera", mainCamera.transform.worldToLocalMatrix);
-		if (SSREnable) {
-			Graphics.Blit (rgbaResult, ssrFinal, blitMat, 1);
-			ssrtCompute.Dispatch(ssrtComputeId, 1024 / 8, 1024 / 8, 1);
-		}
-
-		if (rainVisibility > 0.2) {
-			Graphics.Blit (voronoiCache, voronoiCache, blitMat, 4);
-		}
-		Graphics.Blit (voronoiCache, voronoiNormal, blitMat, 5);
 		/*
 		Graphics.Blit (ssrDepthCache, HiZArray [0]);
 		Graphics.Blit (ssrNormalCache, oceanNormalResult);
@@ -390,6 +393,7 @@ public class postprocessmanager : MonoBehaviour {
 			resizeOnce ();
 		}
 
+		PreRenderUpdate ();
 	}
 	void LateUpdate()
 	{
@@ -403,6 +407,12 @@ public class postprocessmanager : MonoBehaviour {
 	}
 	void OnPreCull()
 	{
+		oceanDepthNormalCamera.Render ();
+		if (SSREnable) {
+			//UpdateSSRT ();
+			ssrtCompute.Dispatch(ssrtComputeId, ssrtSpecFinal.width / 8, ssrtSpecFinal.height / 8, 1);
+			Graphics.Blit (rgbaResult, ssrFinal, blitMat, 1);
+		}
 	}
 	void OnPostRender()
 	{

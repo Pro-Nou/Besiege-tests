@@ -98,7 +98,7 @@ public class lightningPlayer : MonoBehaviour {
 		}
 		progress = lifeTime / duration;
 
-		float progressScale = progress * 4f + 1f;
+		float progressScale = progress * 4f + 3f;
 		lightningMain.transform.localScale = new Vector3 (progressScale, 3f, progressScale);
 		lightningMat.SetFloat ("_Progress", progress);
 		lightningAnchorMat.SetFloat ("_Progress", progress);

@@ -8,7 +8,7 @@
 	}
 	SubShader
 	{
-		Tags {  "QUEUE"="transparent-3" "RenderType"="Background" "PreviewType"="Skybox"}
+		Tags {  "QUEUE"="transparent-20" "RenderType"="Background" "PreviewType"="Skybox"}
 		LOD 100
 		cull off
 		zwrite off

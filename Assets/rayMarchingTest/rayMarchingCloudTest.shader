@@ -33,7 +33,7 @@
     //[NoScaleOffset]_CloudLightMap ("CloudLightMap", 2D) = "white" {}
   }
   SubShader{
-    Tags { "Queue" = "transparent-2" "RenderType" = "volum" "LightMode" = "ForwardBase" "PerformanceChecks"="False" }
+    Tags { "Queue" = "transparent-8" "RenderType" = "volum" "LightMode" = "ForwardBase" "PerformanceChecks"="False" }
     Blend SrcAlpha OneMinusSrcAlpha
     ZWrite on
 	  ZTest less
@@ -164,8 +164,8 @@
 
         float diff1 = screenDepth + mul(UNITY_MATRIX_MV, fixed4(rayOrigin, 1)).z * _ProjectionParams.w;
         float diff2 = screenDepth + mul(UNITY_MATRIX_MV, fixed4(rayOrigin + rayDirection, 1)).z * _ProjectionParams.w;
-        float maxRayLength = min(_ProjectionParams.z / i.localScale.x ,diff1 / (diff1 - diff2));
-        // float maxRayLength = diff1 / (diff1 - diff2);
+        // float maxRayLength = min(_ProjectionParams.z / i.localScale.x ,diff1 / (diff1 - diff2));
+        float maxRayLength = diff1 / (diff1 - diff2);
 
         rayOrigin.y -= _positionOffset.y;
         //rayOrigin.xz +=  fixed2(0.5, 0.5);
@@ -356,11 +356,11 @@
 		hittedPos.y += _positionOffset.y;
 		float3 worldPos = mul(unity_ObjectToWorld, float4(hittedPos, 1)).xyz;
 		float4 clipPos = mul(UNITY_MATRIX_VP, float4(worldPos, 1));
-		finaloutput.depth = 1;
-		if (isHit)
-		{
-			finaloutput.depth = clipPos.z / clipPos.w;
-		}
+		finaloutput.depth = isHit ? clipPos.z / clipPos.w : 1;
+		// if (isHit)
+		// {
+		// 	finaloutput.depth = clipPos.z / clipPos.w;
+		// }
         // finaloutput.col = fixed4(hittedPos.y > -0.01 && isHit, 0, 0, 1);
 		// finaloutput.depth = 0;
 		return finaloutput;
