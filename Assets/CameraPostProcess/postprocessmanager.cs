@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine.Rendering;
+//[ExecuteInEditMode]
 
 public class postprocessmanager : MonoBehaviour {
 
@@ -12,9 +13,9 @@ public class postprocessmanager : MonoBehaviour {
 	public bool SSREnable;
 	public float SSRDistance;
 	public float reflProbeDistance;
-	[Range(-1f, 1f)]
+	[Range(0f, 1f)]
 	public float SSRPixelBias;
-	[Range(-1f, 1f)]
+	[Range(0f, 1f)]
 	public float SSRPixelThickness;
 	[Range(0, 128)]
 	public float SSRCrossFadeDistance;
@@ -60,6 +61,14 @@ public class postprocessmanager : MonoBehaviour {
 	public float oceanHeight;
 	public float oceanDensity;
 	public float oceanUnderWaterVisiableDistance;
+	public Color oceanBaseColor;
+	public Texture2D oceanHeightMap;
+	public Vector2 oceanHeightMapScale;
+	public float oceanHeightScale;
+	public Texture2D oceanWaveCullMap;
+	public Vector2 oceanWaveCullMapScale;
+	public float oceanWaveCullScale;
+	public Vector4 oceanWaveSpeed;
 	[Range(0, 1)]
 	public float rainVisibility;
 	[Range(0, 1)]
@@ -234,6 +243,18 @@ public class postprocessmanager : MonoBehaviour {
 		Vector3 oldPos = oceanObject.transform.position;
 		oldPos.y = oceanHeight;
 		oceanObject.transform.position = oldPos;
+
+		Material oceanMat = oceanObject.GetComponent<MeshRenderer> ().materials [1];
+		oceanMat.SetColor("_OceanBaseColor", oceanBaseColor);
+		oceanMat.SetTexture("_OceanHeightMap", oceanHeightMap);
+		oceanMat.SetTextureScale("_OceanHeightMap", oceanHeightMapScale);
+		oceanMat.SetFloat ("_OceanHeightScale", oceanHeightScale);
+		oceanMat.SetTexture ("_OceanWaveCullMap", oceanWaveCullMap);
+		oceanMat.SetTextureScale("_OceanWaveCullMap", oceanWaveCullMapScale);
+		oceanMat.SetFloat ("_OceanWaveCullScale", oceanWaveCullScale);
+		oceanMat.SetVector ("_OceanWaveSpeed", oceanWaveSpeed);
+		oceanObject.GetComponent<MeshRenderer> ().materials [0].CopyPropertiesFromMaterial (oceanMat);
+		oceanObject.transform.GetChild (0).gameObject.GetComponent<MeshRenderer> ().material.CopyPropertiesFromMaterial (oceanMat);
 		cloudmove.oceanHeightFix (oceanHeight);
 
 	}
@@ -403,16 +424,16 @@ public class postprocessmanager : MonoBehaviour {
 	}
 	void OnPreRender()
 	{
-		//ssrCamera.Render ();
-	}
-	void OnPreCull()
-	{
 		oceanDepthNormalCamera.Render ();
 		if (SSREnable) {
 			//UpdateSSRT ();
 			ssrtCompute.Dispatch(ssrtComputeId, ssrtSpecFinal.width / 8, ssrtSpecFinal.height / 8, 1);
 			Graphics.Blit (rgbaResult, ssrFinal, blitMat, 1);
 		}
+		//ssrCamera.Render ();
+	}
+	void OnPreCull()
+	{
 	}
 	void OnPostRender()
 	{

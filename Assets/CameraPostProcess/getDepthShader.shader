@@ -189,8 +189,8 @@
 				float3 viewPos = viewVec * _SSRDistance * depth; 
 
 				// float3 worldPos = mul(unity_CameraToWorld, float4(viewPos, 1)).xyz;
-				float3 worldPos = mul(_MainCameraToWorld, float4(viewPos, 1)).xyz;
-				float3 worldViewDir = normalize(_WorldSpaceCameraPos.xyz - worldPos);
+				// float3 worldPos = mul(_MainCameraToWorld, float4(viewPos, 1)).xyz;
+				// float3 worldViewDir = normalize(_WorldSpaceCameraPos.xyz - worldPos);
 				// return float4(viewNormal, 1);
 
                 float3 reflViewDir = reflect(normalize(viewVec), normalize(viewNormal));
@@ -234,6 +234,7 @@
 				float pixelBias = _SSRPixelBias / _SSRDistance;
 				float pixelThickness = _SSRPixelThickness / _SSRDistance;
                 float SSRcount = 0;
+				float SSRlength1 = 9999;
                 while (reflLod >= 0 && SSRcount < _SSRMaxStep)
                 {
                 	float2 reflSamplePos = reflSampleBase + reflSampleLength * srcReflDir;
@@ -248,7 +249,7 @@
                 	// float3 viewVec0 = mul(unity_CameraInvProjection, clipVec0.xyzz).xyz;
                 	float3 viewVec0 = mul(_MainCameraInvProjection, clipVec0.xyzz).xyz * _SSRDistance;
 					float3 viewPos1 = getCross(viewPos, reflViewDir, float3(0, 0, 0), viewVec0);
-                	// float SSRlength1 = length(viewPos1 - viewPos) + SSRlength0;
+					SSRlength1 = length(viewPos1 - viewPos);
                 	float depth0 = viewPos1 / viewVec0;
                 	if (depth0 < 0 || depth0 > 1)
                 	{
@@ -259,7 +260,7 @@
 					float screenDepth0 = m_DecodeFloatRG(tex2Dlod(_MainCameraOceanDepth, float4(reflSamplePos, 0, reflLod)));
 					// float screenDepth0 = (tex2Dlod(_MainCameraOceanDepth, float4(reflSamplePos, 0, 0)).x - 1) / _SSRDistance;
 
-                	if (screenDepth0 + pixelBias * 0.01 < depth0 && depth0 < screenDepth0 + max(abs(lastDepth - depth0), pixelThickness))
+                	if (SSRlength1 > pixelBias && screenDepth0 - pixelBias * 0.01 < depth0 && depth0 < screenDepth0 + max(abs(lastDepth - depth0), pixelThickness))
                 	{
                 		reflValid = (reflLod == 0);
                 		thisScrDepth = screenDepth0;
@@ -286,6 +287,7 @@
             	// float4 reflEncoded = float4(floor(reflCol.r * 255) + (reflCol.g / 2), floor(reflCol.b * 255) + (reflCol.a / 2), 1, 1);
 				// return reflDecoded;
 				// return float4((reflCol.x << 16 + reflCol.y), (reflCol.z << 16 + reflCol.w), 1, 1);
+				// return float4(SSRlength1 < pixelBias, 0, 0, 1);
 				return reflCol;
 				}
 			ENDCG

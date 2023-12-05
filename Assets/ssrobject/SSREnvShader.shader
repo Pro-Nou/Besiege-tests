@@ -338,11 +338,14 @@
                 // spec = isUnderWater ? -spec : spec;
 				fixed clearCoatSmoothness = lerp(_Smoothness, 0.85, min(rainClearCoatAmount * 5, 1));
 				fixed specSmoothness = lerp(0.0001, 0.5, 1 - clearCoatSmoothness);
-				fixed specCularScale = lerp(0.0005, 0.01, 1 - clearCoatSmoothness);
+				fixed specCularScale = lerp(0.0001, 0.1, 1 - clearCoatSmoothness);
 				fixed specular = smoothstep(-specSmoothness, specSmoothness, spec+specCularScale-1);
 				// fixed specularClearCoat = lerp(0,1,smoothstep(-0.001, 0.001, spec+0.002-1));
 
                 fixed diffValue = dot(bump, worldLightDir);
+				fixed rim = (1 - dot(bump, worldViewDir)) * (1 - rainSmooth);
+				rim = saturate(-diffValue * rim);
+				// fixed4 glow = rim * _RimColor * _LightColor0;
 				fixed rcvShadow = SHADOW_ATTENUATION(i);
 				specular *= rcvShadow;
 				fixed pondingSpecular = rcvShadow * lerp(0,1,smoothstep(-0.05, 0.05, spec+0.0025-1)) * 0.75;
@@ -351,7 +354,7 @@
 				// return fixed4(rcvShadow, 0, 0, 1);
 
                 diffValue = min(rcvShadow, saturate(diffValue));
-                float3 lightCompute = (_LightColor0 * diffValue);
+                float3 lightCompute = (_LightColor0 * (diffValue + rim));
 
 				fixed4 ssrtSpecCol = fixed4(0,0,0,1);
 				fixed4 ssrtDiffCol = fixed4(0,0,0,1);
@@ -368,7 +371,7 @@
                    
 					ssrtSpecCol = tex2Dlod(_MainCameraSSRTSpecMap, float4(srcPosFrac, 0, 0));
 					ssrtDiffCol = tex2Dlod(_MainCameraSSRTDiffMap, float4(srcPosFrac, 0, 0));
-					ssrtDiffCol *= (1 - rainMetallic);
+					// ssrtDiffCol *= (1 - rainMetallic);
                     // ssrtSpecCol.a = 1;
 					reflCol = tex2DBlurLod(_MainCameraSSRMap, srcPosFrac, _MainCameraSSRMap_TexelSize, SSRRoughness);
                     // reflCol = lerp(texCUBElod(_MainCameraReflProbe, fixed4(reflDir, 0)), reflCol, reflCol.a);
@@ -385,19 +388,17 @@
 				// fixed4 final = col;
 				// final = final * _ReflactAmount + col * (1 - _ReflactAmount);
 				fixed4 emiss = _EmissCol * tex2Dlod(_EmissMap, float4(i.uv.zw, 0, 0));
-				fixed rim = (1 - dot(bump, worldViewDir)) * (1 - rainSmooth);
-				fixed4 glow = rim * _RimColor * _LightColor0;
 				fixed4 final = col;
 				// final = lerp(final, lerp(col * reflCol, reflCol, _ReflactPower), _ReflactAmount);
 				// final *= (1 - rainMetallic);
-				fixed4 finalAmbient = final;
-				final *= float4(lightCompute, 1);
+				// fixed4 finalAmbient = final;
+				final *= float4(lightCompute + UNITY_LIGHTMODEL_AMBIENT.rgb + ssrtDiffCol.rgb, 1);
 				// reflCol *= rainMetallic;
 				// fixed fresnel = (1 - _Smoothness) + (_Smoothness) * pow((1 - dot(-worldViewDir, worldNormal)), 5);
 				final = lerp(final, reflCol * col * (1 - rainClearCoatAmount), rainMetallic);
 				fixed4 specCol = _LightColor0 * specular + ssrtSpecCol;
 				fixed4 finalSpec = specCol * clearCoatSmoothness * (1 - rainClearCoatAmount) + specCol * rainClearCoatAmount;
-				final += emiss + glow + UNITY_LIGHTMODEL_AMBIENT * finalAmbient + ssrtDiffCol;
+				final += emiss;
 				final += rainClearCoatAmount * reflCol + finalSpec;
 				fixed4 pondingCol = reflPonding + specCol;
 				final = lerp(final, pondingCol, saturate(ponding * _PondingPower));

@@ -2,11 +2,16 @@
 {
 	Properties
 	{
-    	_baseColor ("base color", Color) = (1.0,1.0,1.0,1.0)
+    	_OceanBaseColor ("Ocean Base Color", Color) = (1.0,1.0,1.0,1.0)
+        _OceanHeightMap ("Height Map", 2D) = "white" {}
+        _OceanHeightScale("Height Scale", Range(0, 4)) = 1
+        _OceanWaveSpeed("Wave Speed", Vector) = (0, 0, 0, 0)
+        _OceanWaveCullMap ("Wave Cull Map", 2D) = "white" {}
+        _OceanWaveCullScale ("Wave Cull Scale", range(0, 1)) = 0
 	}
 	SubShader
 	{
-		Tags { "RenderType"="volum" "Queue"="transparent-10" "LightMode" = "ForwardBase" "PerformanceChecks"="False"}
+		Tags { "RenderType"="volum" "Queue"="transparent+1" "LightMode" = "ForwardBase" "PerformanceChecks"="False"}
 			ZWrite on
 			Cull off
 			blend SrcAlpha OneMinusSrcAlpha
@@ -20,12 +25,22 @@
 			
 			#include "UnityCG.cginc"
 
-			float4 _baseColor;
+			float4 _OceanBaseColor;
 			float _OceanDensity;
 			float _OceanHeight;
 			float _OceanUnderWaterVisiableDistance;
 			sampler2D _CameraDepthTexture;
 			float4 _CameraDepthTexture_TexelSize;
+			sampler2D _OceanHeightMap;
+			float4 _OceanHeightMap_ST;
+			float4 _OceanHeightMap_TexelSize;
+			sampler2D _AttachMap;
+			float4 _AttachMap_TexelSize;
+			sampler2D _OceanWaveCullMap;
+			float4 _OceanWaveCullMap_ST;
+			float _OceanWaveCullScale;
+			float _OceanHeightScale;
+			float4 _OceanWaveSpeed;
 
 			struct appdata
 			{
@@ -72,13 +87,22 @@
 				float3 viewVec = mul(unity_CameraInvProjection, clipVec.xyzz).xyz;
 				float3 viewPos = viewVec * screenDepthOrg;
 				float3 worldPos0 = mul(unity_CameraToWorld, float4(viewPos, 1)).xyz;
-				clip(_OceanHeight - worldPos0.y);
-				bool isUnderWater = (_WorldSpaceCameraPos.y < _OceanHeight);
+
+                float2 waveOffset = _OceanWaveSpeed.xy * _Time.x;
+                float2 waveMaskOffset = _OceanWaveSpeed.zw * _Time.x;
+				float2 uv1 = TRANSFORM_TEX(worldPos0.xz, _OceanWaveCullMap) + waveMaskOffset;
+				float2 uv2 = TRANSFORM_TEX(worldPos0.xz, _OceanHeightMap) + waveOffset;
+				float waveMask = max(0, tex2Dlod(_OceanWaveCullMap, float4(uv1, 0, 0)).r - _OceanWaveCullScale);
+				waveMask = smoothstep(0, 1 - _OceanWaveCullScale, waveMask) * _OceanHeightScale;
+				float waveHeight = tex2Dlod(_OceanHeightMap, float4(uv2, 0, 0)).r * waveMask;
+				float oceanWaveHeight = _OceanHeight + waveHeight;
+				clip(oceanWaveHeight - worldPos0.y);
+				//bool isUnderWater = (_WorldSpaceCameraPos.y < _OceanHeight);
 				// float3 objectPos = mul(unity_WorldToObject, float4(worldPos0,1)).xyz;
 				// bool worldPosInside = (objectPos.y < 0);
 
-				float viewDepth = 0;
-				float depthCompute = isUnderWater ? screenDepthOrg : screenDepthOrg * (abs(_OceanHeight - worldPos0.y) / abs(_WorldSpaceCameraPos.y - worldPos0.y));
+				//float viewDepth = 0;
+				//float depthCompute = isUnderWater ? screenDepthOrg : screenDepthOrg * (abs(_OceanHeight - worldPos0.y) / abs(_WorldSpaceCameraPos.y - worldPos0.y));
                 // float viewDepth = -mul(UNITY_MATRIX_MV, fixed4(_WorldSpaceCameraPos.xyz, 1)).z * _ProjectionParams.w;
                 float underWaterIntersect = _OceanDensity * smoothstep(0, _ProjectionParams.w * _OceanUnderWaterVisiableDistance, screenDepthOrg);
 
@@ -87,7 +111,7 @@
 
                 // fixed3 worldViewDir = normalize(UnityWorldSpaceViewDir(i.worldPos));
 				depth = screenDepthNoLinear;
-				return fixed4(_baseColor.rgb, underWaterIntersect);
+				return fixed4(_OceanBaseColor.rgb, underWaterIntersect);
 			}
 			ENDCG
 		}

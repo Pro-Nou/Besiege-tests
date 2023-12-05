@@ -11,7 +11,7 @@
 		// return enc;
 		return ((n + 1) / 2).xy;
 	}
-	inline float m_EncodeFloatRG(float depth)
+	inline float3 m_EncodeFloatRG(float depth)
 	{
 		// float encodeFactor = 128;
 
@@ -25,7 +25,8 @@
 		// depthMod1 -= depthMod2;
 		// depthMod1 /= encodeFactor;
 		// float3 rgb = float3(depthMod0, depthMod1, depthMod2);
-		return depth;
+		// return rgb;
+		return float3(depth, 0, 0);
 	}
 	ENDCG
 	SubShader
@@ -102,7 +103,7 @@
 
 				finalOutPut o;
 				// o.depth = float4(EncodeFloatRG(i.depth),  0, 1);
-				o.depth = float4(m_EncodeFloatRG(i.depth), 0, 0, 1);
+				o.depth = float4(m_EncodeFloatRG(i.depth), 1);
 				// o.depth = float4(i.depth + 1, 0, 0, 1);
 				o.normal = float4((viewNormal + 1) / 2, 1);
 				
@@ -143,17 +144,17 @@
 
 			#define _HeightBump 200
 
-			sampler2D _HeightMap;
-			float4 _HeightMap_ST;
-			float4 _HeightMap_TexelSize;
-			sampler2D _waveMask;
-			float4 _waveMask_ST;
+			sampler2D _OceanHeightMap;
+			float4 _OceanHeightMap_ST;
+			float4 _OceanHeightMap_TexelSize;
+			sampler2D _OceanWaveCullMap;
+			float4 _OceanWaveCullMap_ST;
 			float _interactFadeUV;
 
-			float _waveCull;
-			float _HeightScale;
+			float _OceanWaveCullScale;
+			float _OceanHeightScale;
 			// float _HeightBump;
-			float4 _waveSpeed;
+			float4 _OceanWaveSpeed;
 
 			float _TessFadeDist;
 			float _TessMinDist;
@@ -300,22 +301,22 @@
 				float4 positionOS = patch[0].positionOS * bary.x + patch[1].positionOS * bary.y + patch[2].positionOS * bary.z; 
 				float4 uv = patch[0].uv * bary.x + patch[1].uv * bary.y + patch[2].uv * bary.z; 
 				float4 tangentOS = patch[0].tangent * bary.x + patch[1].tangent * bary.y + patch[2].tangent * bary.z; 
-				float3 normalOS = patch[0].normal * bary.x + patch[1].normal * bary.y + patch[2].normal * bary.z; 
+				//float3 normalOS = patch[0].normal * bary.x + patch[1].normal * bary.y + patch[2].normal * bary.z; 
 
-                float2 waveOffset = _waveSpeed.xy * _Time.x;
-                float2 waveMaskOffset = _waveSpeed.zw * _Time.x;
+                float2 waveOffset = _OceanWaveSpeed.xy * _Time.x;
+                float2 waveMaskOffset = _OceanWaveSpeed.zw * _Time.x;
                 output.worldPos = mul(unity_ObjectToWorld, positionOS).xyz;
-                // output.uv.xy = TRANSFORM_TEX(uv.xy, _HeightMap) + waveOffset;
-                // output.uv.zw = TRANSFORM_TEX(uv.xy, _waveMask) + waveMaskOffset;
-                output.uv.xy = TRANSFORM_TEX(output.worldPos.xz, _HeightMap) + waveOffset;
-                output.uv.zw = TRANSFORM_TEX(output.worldPos.xz, _waveMask) + waveMaskOffset;
+                // output.uv.xy = TRANSFORM_TEX(uv.xy, _OceanHeightMap) + waveOffset;
+                // output.uv.zw = TRANSFORM_TEX(uv.xy, _OceanWaveCullMap) + waveMaskOffset;
+                output.uv.xy = TRANSFORM_TEX(output.worldPos.xz, _OceanHeightMap) + waveOffset;
+                output.uv.zw = TRANSFORM_TEX(output.worldPos.xz, _OceanWaveCullMap) + waveMaskOffset;
                 bool shouldInteract = uv.z <= (1 - _interactFadeUV) && uv.z >= _interactFadeUV && uv.w <= (1 - _interactFadeUV) && uv.w >= _interactFadeUV;
                 
                 if (shouldInteract)
                 {
-                    float waveMask = max(0, tex2Dlod(_waveMask, float4(output.uv.zw, 0, 0)).r - _waveCull);
-                    waveMask = smoothstep(0, 1 - _waveCull, waveMask) * _HeightScale;
-                    float height = tex2Dlod(_HeightMap, float4(output.uv.xy, 0, 0)).r * waveMask;
+					float waveMask = max(0, tex2Dlod(_OceanWaveCullMap, float4(output.uv.zw, 0, 0)).r - _OceanWaveCullScale);
+					waveMask = smoothstep(0, 1 - _OceanWaveCullScale, waveMask) * _OceanHeightScale;
+                    float height = tex2Dlod(_OceanHeightMap, float4(output.uv.xy, 0, 0)).r * waveMask;
                     positionOS.y += height;
 					output.worldPos.y += height;
                 }
@@ -331,19 +332,19 @@
 				float2 srcPosFrac = i.scrPos.xy / i.scrPos.w;
 
                 fixed3 worldViewDir = normalize(UnityWorldSpaceViewDir(i.worldPos));
-                float waveMask = max(0, tex2Dlod(_waveMask, float4(i.uv.zw, 0, 0)).r - _waveCull);
-                waveMask = smoothstep(0, 1 - _waveCull, waveMask) * _HeightScale;
+                float waveMask = max(0, tex2Dlod(_OceanWaveCullMap, float4(i.uv.zw, 0, 0)).r - _OceanWaveCullScale);
+                waveMask = smoothstep(0, 1 - _OceanWaveCullScale, waveMask) * _OceanHeightScale;
 
-                float3 normalOS = grayToNormal(_HeightMap, _HeightMap_TexelSize.xy, i.uv.xy);
+                float3 normalOS = grayToNormal(_OceanHeightMap, _OceanHeightMap_TexelSize.xy, i.uv.xy);
 				normalOS = lerp(fixed3(0,1,0), normalOS, waveMask);
-				normalOS.xz *= -1;
+				// normalOS.xz *= -1;
 
-                float3 worldNormal = UnityObjectToWorldNormal(normalOS);
+                float3 worldNormal = UnityObjectToWorldNormal(normalize(normalOS));
 				float3 viewNormal = normalize(mul((float3x3)unity_WorldToCamera, worldNormal));
 				// viewNormal.z *= -1;
 				finalOutPut o;
 				// o.depth = float4(EncodeFloatRG(i.depth), 0, 1);
-				o.depth = float4(m_EncodeFloatRG(i.depth), 0, 0, 1);
+				o.depth = float4(m_EncodeFloatRG(i.depth), 1);
 				// o.depth = float4(i.depth + 1, 0, 0, 1);
 				o.normal = float4((viewNormal + 1) / 2, 1);
 				o.specPre = float4(_SpecularScale, _SpecularSmoothness, 1, 1);

@@ -314,18 +314,20 @@
                 // spec = isUnderWater ? -spec : spec;
 				fixed clearCoatSmoothness = lerp(_Smoothness, 0.85, min(rainClearCoatAmount * 5, 1));
 				fixed specSmoothness = lerp(0.0001, 0.5, 1 - clearCoatSmoothness);
-				fixed specCularScale = lerp(0.0005, 0.1, 1 - clearCoatSmoothness);
+				fixed specCularScale = lerp(0.0001, 0.1, 1 - clearCoatSmoothness);
 				fixed specular = smoothstep(-specSmoothness, specSmoothness, spec+specCularScale-1);
 				// fixed specularClearCoat = lerp(0,1,smoothstep(-0.001, 0.001, spec+0.002-1));
 
                 fixed diffValue = dot(bump, worldLightDir);
+				fixed rim = (1 - dot(bump, worldViewDir)) * (1 - rainSmooth);
+				rim = saturate(-diffValue * rim);
 				fixed rcvShadow = SHADOW_ATTENUATION(i);
 				specular *= rcvShadow;
 
 				// return fixed4(rcvShadow, 0, 0, 1);
 
                 diffValue = min(rcvShadow, saturate(diffValue));
-                fixed3 lightCompute = (_LightColor0 * diffValue);
+                float3 lightCompute = (_LightColor0 * (diffValue + rim));
 
 
 				fixed4 ssrtSpecCol = fixed4(0,0,0,1);
@@ -339,7 +341,7 @@
                 {
 					ssrtSpecCol = tex2Dlod(_MainCameraSSRTSpecMap, float4(srcPosFrac, 0, 0));
 					ssrtDiffCol = tex2Dlod(_MainCameraSSRTDiffMap, float4(srcPosFrac, 0, 0));
-					ssrtDiffCol *= (1 - _Metallic);
+					// ssrtDiffCol *= (1 - _Metallic);
                     // ssrtSpecCol.a = 1;
 					// reflClearCoat = tex2Dlod(_MainCameraSSRMap, float4(srcPosFrac, 0, 0));
 					reflCol = tex2DBlurLod(_MainCameraSSRMap, srcPosFrac, _MainCameraSSRMap_TexelSize, SSRRoughness);
@@ -361,21 +363,20 @@
 				fixed4 bloodCol = _BloodColor * tex2Dlod(_BloodMap, float4(i.uv1.zw, 0, 0));
 				fixed4 damageCol = tex2Dlod(_DamageMap, float4(i.uv2.xy, 0, 0));
 				fixed4 emiss = _EmissCol * tex2Dlod(_EmissMap, float4(i.uv.zw, 0, 0));
-				fixed rim = (1 - dot(bump, worldViewDir)) * (1 - rainSmooth);
-				fixed4 glow = rim * _RimColor * _LightColor0;
-				fixed4 final = col * (1 - _Metallic);
+				fixed4 final = col;
 				final = lerp(final, damageCol, _DamageAmount * (1 - damageCol));
 				final = lerp(final, bloodCol, _BloodAmount * bloodCol.a);
 				final = lerp(final, iceCol, _FreezeAmount * iceCol);
 				// final = lerp(final, lerp(col * reflCol, reflCol, _ReflactPower), _ReflactAmount);
-				fixed4 finalAmbient = final;
-				final *= fixed4(lightCompute, 1);
+				// fixed4 finalAmbient = final;
+				final *= float4(lightCompute + UNITY_LIGHTMODEL_AMBIENT.rgb + ssrtDiffCol.rgb, 1);
+				// final *= fixed4(lightCompute, 1);
 				// reflCol *= _Metallic;
 				// fixed fresnel = (1 - _Smoothness) + (_Smoothness) * pow((1 - dot(-worldViewDir, worldNormal)), 5);
 				final = lerp(final, reflCol * col * (1 - rainClearCoatAmount), _Metallic);
 				fixed4 specCol = _LightColor0 * specular + ssrtSpecCol;
 				fixed4 finalSpec = specCol * clearCoatSmoothness * (1 - rainClearCoatAmount) + specCol * rainClearCoatAmount;
-				final += emiss + glow + UNITY_LIGHTMODEL_AMBIENT * finalAmbient + ssrtDiffCol;
+				final += emiss;
 				final += rainClearCoatAmount * reflCol + finalSpec;
 				// fixed4 clearCoat = rainClearCoatAmount * (reflClearCoat + _LightColor0 * specularClearCoat);
 				// apply fog
