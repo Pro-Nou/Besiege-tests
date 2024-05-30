@@ -356,9 +356,9 @@
 					reflCol = texCubeBlur(_MainCameraReflProbe, reflDir, _MainCameraReflProbe_TexelSize.xy, SSRRoughness);
 				}
 				#endif
-                // fixed4 final = max(fixed4(0.1,0.1,0.1,1), col) * (reflCol * _ReflactAmount + fixed4(1, 1, 1, 1) * (1 - _ReflactAmount));
+                // fixed4 final = max(fixed4(0.1,0.1,0.1,1), col) * (reflCol * _ReflectAmount + fixed4(1, 1, 1, 1) * (1 - _ReflectAmount));
 				// fixed4 final = col;
-				// final = final * _ReflactAmount + col * (1 - _ReflactAmount);
+				// final = final * _ReflectAmount + col * (1 - _ReflectAmount);
 				fixed4 iceCol = tex2Dlod(_IceMap, float4(i.uv1.xy, 0, 0));
 				fixed4 bloodCol = _BloodColor * tex2Dlod(_BloodMap, float4(i.uv1.zw, 0, 0));
 				fixed4 damageCol = tex2Dlod(_DamageMap, float4(i.uv2.xy, 0, 0));
@@ -367,7 +367,7 @@
 				final = lerp(final, damageCol, _DamageAmount * (1 - damageCol));
 				final = lerp(final, bloodCol, _BloodAmount * bloodCol.a);
 				final = lerp(final, iceCol, _FreezeAmount * iceCol);
-				// final = lerp(final, lerp(col * reflCol, reflCol, _ReflactPower), _ReflactAmount);
+				// final = lerp(final, lerp(col * reflCol, reflCol, _ReflectPower), _ReflectAmount);
 				// fixed4 finalAmbient = final;
 				final *= float4(lightCompute + UNITY_LIGHTMODEL_AMBIENT.rgb + ssrtDiffCol.rgb, 1);
 				// final *= fixed4(lightCompute, 1);

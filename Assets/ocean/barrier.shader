@@ -11,15 +11,15 @@
 	SubShader
 	{
 		Blend srcalpha Oneminussrcalpha
-		ZWrite off
+		ZWrite on
+		ZTest less
 		Cull off
 
-		Tags
-		{
-			"RenderType"="transparent"
-			"Queue"="Transparent"
-		}
-
+        Tags
+        {
+            "RenderType"="transparent"
+			"Queue"="Transparent+3"
+        }
 		Pass
 		{
 			CGPROGRAM

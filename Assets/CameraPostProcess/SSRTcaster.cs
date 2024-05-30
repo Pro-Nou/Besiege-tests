@@ -14,6 +14,7 @@ public class SSRTcaster : MonoBehaviour {
 	public float ambientAmount;
 	public bool isStatic;
 	public bool shouldUpdate;
+	public bool castShadow;
 	//public postprocessmanager ppmanager;
 	private int m_hashcode;
 	public postprocessmanager.LightData lightData;
@@ -36,6 +37,7 @@ public class SSRTcaster : MonoBehaviour {
 		lightData.forward = this.transform.forward;
 		lightData.angleCrossFade = angleCrossFade;
 		lightData.ambientAmount = ambientAmount;
+		lightData.castShadow = this.castShadow;
 	}
 	void OnEnable() {
 		m_hashcode = this.gameObject.GetHashCode ();
@@ -55,6 +57,11 @@ public class SSRTcaster : MonoBehaviour {
 			lightData.position = this.transform.position;
 			lightData.forward = this.transform.forward;
 		}
+		lightData.castShadow = this.castShadow;
+		// if (castShadow) {
+		// 	Vector3 srcPos = postprocessmanager.instance.mainCamera.WorldToScreenPoint(this.transform.position);
+		// 	lightData.srcPos = new Vector2(srcPos.x / Screen.width, srcPos.y / Screen.height);
+		// }
 		if (shouldUpdate) {
 			postprocessmanager.instance.TransformSSRTCaster (m_hashcode, lightData);
 		}

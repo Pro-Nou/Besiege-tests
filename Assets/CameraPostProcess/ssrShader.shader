@@ -32,7 +32,8 @@
         sampler2D _SSRMaskTex;
         float4 _SSRMaskTex_ST;
 
-        float _interactFadeUV;
+        // float _interactFadeUV;
+        float _interactFadeDistance;
         float _waveCull;
         float _HeightScale;
         // float _HeightBump;
@@ -55,7 +56,7 @@
         float _SpecularScale;
         float _SpecularSmoothness;
         float _invY;
-        fixed _ReflactAmount;
+        fixed _ReflectAmount;
         fixed _RefractAmount;
 
         float _TessFadeDist;
@@ -443,7 +444,8 @@
                 output.uv.xy = TRANSFORM_TEX(uv.xy, _HeightMap) + waveOffset;
                 output.uv.zw = TRANSFORM_TEX(uv.xy, _BumpMap) + waveOffset;
                 output.uv1.xy = TRANSFORM_TEX(uv.xy, _waveMask) + waveMaskOffset;
-                bool shouldInteract = uv.z <= (1 - _interactFadeUV) && uv.z >= _interactFadeUV && uv.w <= (1 - _interactFadeUV) && uv.w >= _interactFadeUV;
+                // bool shouldInteract = uv.z <= (1 - _interactFadeUV) && uv.z >= _interactFadeUV && uv.w <= (1 - _interactFadeUV) && uv.w >= _interactFadeUV;
+                bool shouldInteract = abs(positionOS.x - _WorldSpaceCameraPos.x) < _interactFadeDistance && abs(positionOS.z - _WorldSpaceCameraPos.z) < _interactFadeDistance;
                 
                 if (shouldInteract)
                 {
@@ -474,7 +476,7 @@
 
                 fixed3 worldViewDir = normalize(UnityWorldSpaceViewDir(i.worldPos));
                 float waveMask = max(0, tex2Dlod(_waveMask, float4(i.uv1.xy, 0, 0)).r - _waveCull);
-                waveMask = smoothstep(0, 1 - _waveCull, waveMask) * _HeightScale;
+                waveMask = smoothstep(0, 1 - _waveCull, waveMask); //* _HeightScale;
 
                 float3 normalOS = grayToNormal(_HeightMap, _HeightMap_TexelSize.xy, i.uv.xy, _HeightBump, waveMask);
 

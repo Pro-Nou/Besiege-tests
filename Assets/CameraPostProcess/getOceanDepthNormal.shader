@@ -99,6 +99,7 @@
 				fixed4 col = _Color * tex2Dlod(_MainTex, float4(i.uv.xy, 0, 0));
 				clip(col.a - _Cutoff);
 				float3 viewNormal = normalize(mul((float3x3)unity_WorldToCamera, i.normal));
+				// viewNormal.xy = 0;
 				// viewNormal.z *= -1;
 
 				finalOutPut o;
@@ -149,7 +150,8 @@
 			float4 _OceanHeightMap_TexelSize;
 			sampler2D _OceanWaveCullMap;
 			float4 _OceanWaveCullMap_ST;
-			float _interactFadeUV;
+			// float _interactFadeUV;
+			float _interactFadeDistance;
 
 			float _OceanWaveCullScale;
 			float _OceanHeightScale;
@@ -310,7 +312,8 @@
                 // output.uv.zw = TRANSFORM_TEX(uv.xy, _OceanWaveCullMap) + waveMaskOffset;
                 output.uv.xy = TRANSFORM_TEX(output.worldPos.xz, _OceanHeightMap) + waveOffset;
                 output.uv.zw = TRANSFORM_TEX(output.worldPos.xz, _OceanWaveCullMap) + waveMaskOffset;
-                bool shouldInteract = uv.z <= (1 - _interactFadeUV) && uv.z >= _interactFadeUV && uv.w <= (1 - _interactFadeUV) && uv.w >= _interactFadeUV;
+                // bool shouldInteract = uv.z <= (1 - _interactFadeUV) && uv.z >= _interactFadeUV && uv.w <= (1 - _interactFadeUV) && uv.w >= _interactFadeUV;
+                bool shouldInteract = abs(positionOS.x - _WorldSpaceCameraPos.x) < _interactFadeDistance && abs(positionOS.z - _WorldSpaceCameraPos.z) < _interactFadeDistance;
                 
                 if (shouldInteract)
                 {
@@ -333,14 +336,18 @@
 
                 fixed3 worldViewDir = normalize(UnityWorldSpaceViewDir(i.worldPos));
                 float waveMask = max(0, tex2Dlod(_OceanWaveCullMap, float4(i.uv.zw, 0, 0)).r - _OceanWaveCullScale);
-                waveMask = smoothstep(0, 1 - _OceanWaveCullScale, waveMask) * _OceanHeightScale;
+                waveMask = smoothstep(0, 1 - _OceanWaveCullScale, waveMask);// * _OceanHeightScale;
 
                 float3 normalOS = grayToNormal(_OceanHeightMap, _OceanHeightMap_TexelSize.xy, i.uv.xy);
-				normalOS = lerp(fixed3(0,1,0), normalOS, waveMask);
-				// normalOS.xz *= -1;
+				// normalOS = lerp(fixed3(0,1,0), normalOS, waveMask);
+				normalOS.y /= max(0.0001, _OceanHeightScale * waveMask);
+				normalOS = normalize(normalOS);
+				// normalOS = float3(0, 1, 0);
 
-                float3 worldNormal = UnityObjectToWorldNormal(normalize(normalOS));
-				float3 viewNormal = normalize(mul((float3x3)unity_WorldToCamera, worldNormal));
+                // float3 worldNormal = UnityObjectToWorldNormal(normalize(normalOS));
+				float3 viewNormal = normalize(mul((float3x3)unity_WorldToCamera, normalOS));
+				// viewNormal.x *= -1;
+				// viewNormal.xy = 0;
 				// viewNormal.z *= -1;
 				finalOutPut o;
 				// o.depth = float4(EncodeFloatRG(i.depth), 0, 1);

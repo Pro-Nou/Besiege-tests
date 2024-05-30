@@ -7,7 +7,8 @@
 
     	_SSRRoughness ("SSR Roughness", range(0, 7)) = 0
 
-        _interactFadeUV ("Interact Fade UV", range(0, 0.5)) = 0.2
+        // _interactFadeUV ("Interact Fade UV", range(0, 0.5)) = 0.2
+        _interactFadeDistance ("Interact Fade Distance", range(0, 100)) = 100
         _OceanHeightMap ("Ocean Height Map", 2D) = "white" {}
         _OceanHeightScale("Height Scale", Range(0, 4)) = 1
         // _HeightBump("Height Bump", Range(0.001, 1)) = 0.2
@@ -21,7 +22,10 @@
         _TessMinDist("Tessellation Min Distance", Range(0.1, 10)) = 1
 
     	_OceanBaseColor ("base color", Color) = (1.0,1.0,1.0,1.0)
+    	_OceanSecondColor ("second color", Color) = (1.0,1.0,1.0,1.0)
         _BubbleMap ("Bubble Map", 2D) = "white" {}
+        // _BubbleStartHeight ("Bubble Start Height", range(0, 1)) = 0
+        // _BubbleAlphaMulti ("Bubble Alpha Multi", range(0, 10)) = 1
 
         _BumpMap ("Normal Map", 2D) = "bump" {}
         _BumpScale ("Bump Scale", range(0,10)) = 1
@@ -29,7 +33,7 @@
 		_SpecularScale ("Specular Scale", Range(0,1)) = 0.02
 		_SpecularSmoothness ("Specular Smoothness", Range(0,1)) = 0.1
         _Distortion ("Distortion", Range(0, 100)) = 10
-        _ReflactAmount ("Reflect Amount", Range(0.0, 1.0)) = 1.0
+        _ReflectAmount ("Reflect Amount", Range(0.0, 1.0)) = 1.0
     }
     CGINCLUDE
         #include "UnityCG.cginc"
@@ -60,7 +64,8 @@
         sampler2D _BumpMap;
         float4 _BumpMap_ST;
 
-        float _interactFadeUV;
+        // float _interactFadeUV;
+        float _interactFadeDistance;
         float _OceanWaveCullScale;
         float _OceanHeightScale;
         // float _HeightBump;
@@ -68,6 +73,9 @@
         float _AttachBump;
         float _rainVisibility;
         float _AfterRainAmount;
+
+        float _BubbleStartHeight;
+        float _BubbleAlphaMulti;
 
         float _SSRRoughness;
         float _SSRDistance;
@@ -84,14 +92,16 @@
         float4 _CameraDepthTexture_TexelSize;
 
         fixed4 _OceanBaseColor;
+        fixed4 _OceanSecondColor;
         float _FrontFace;
         float _OceanDensity;
+        float _OceanDensityMin;
         float _OceanUnderWaterVisiableDistance;
         float _EdgeScale;
         float _SpecularScale;
         float _SpecularSmoothness;
         float _invY;
-        fixed _ReflactAmount;
+        fixed _ReflectAmount;
 
         float _TessFadeDist;
         float _TessMinDist;
@@ -280,6 +290,7 @@
             "RenderType"="OceanBack" "Queue"="transparent+2" "LightMode" = "ForwardBase" "PerformanceChecks"="False" "DisableBatching"="true"
         }
         	ZWrite on
+            // ZTest less
             Cull front
             Blend One Zero
 
@@ -349,7 +360,8 @@
                 output.uv2.xy = float2(0,0);
                 output.uv2.zw = uv.zw;
 
-                output.shouldInteract = uv.z <= (1 - _interactFadeUV) && uv.z >= _interactFadeUV && uv.w <= (1 - _interactFadeUV) && uv.w >= _interactFadeUV;
+                // output.shouldInteract = uv.z <= (1 - _interactFadeUV) && uv.z >= _interactFadeUV && uv.w <= (1 - _interactFadeUV) && uv.w >= _interactFadeUV;
+                output.shouldInteract = abs(positionOS.x - _WorldSpaceCameraPos.x) < _interactFadeDistance && abs(positionOS.z - _WorldSpaceCameraPos.z) < _interactFadeDistance;
                 if (output.shouldInteract)
                 {
                     float waveMask = max(0, tex2Dlod(_OceanWaveCullMap, float4(output.uv1.zw, 0, 0)).r - _OceanWaveCullScale);
@@ -396,10 +408,14 @@
 				fixed3 worldLightDir = normalize(UnityWorldSpaceLightDir(i.worldPos));
 
                 float waveMask = max(0, tex2Dlod(_OceanWaveCullMap, float4(i.uv1.zw, 0, 0)).r - _OceanWaveCullScale);
-                waveMask = smoothstep(0, 1 - _OceanWaveCullScale, waveMask) * _OceanHeightScale;
-                float3 normalOS = grayToNormal(_OceanHeightMap, _OceanHeightMap_TexelSize.xy, i.uv.xy);
-                normalOS = lerp(fixed3(0,1,0), normalOS, waveMask);
+                waveMask = smoothstep(0, 1 - _OceanWaveCullScale, waveMask);
                 float bubbleAlpha = tex2Dlod(_OceanHeightMap, float4(i.uv.xy, 0, 0)).r * waveMask;
+                // waveMask = waveMask * _OceanHeightScale;
+
+                float3 normalOS = grayToNormal(_OceanHeightMap, _OceanHeightMap_TexelSize.xy, i.uv.xy);
+                // normalOS = lerp(fixed3(0,1,0), normalOS, waveMask);
+				normalOS.y /= max(0.0001, _OceanHeightScale * waveMask);
+                normalOS = normalize(normalOS);
                 // bool isUnderWater = _WorldSpaceCameraPos.y < unity_ObjectToWorld[1].w;
                 bool isUnderWater = true;
                 
@@ -419,7 +435,8 @@
                     fixed3 normalRain = grayToNormal(_RainMap, _RainMap_TexelSize.xy, rainUV);
                     // float3 normalRain = float3(tex2Dlod(_rainMap, float4(rainUV, 0, 0)).xy * 2 - 1, 1);
                     float3 normalAttach = grayToNormal(_AttachMap, _AttachMap_TexelSize.xy, i.uv2.zw);
-                    normalOS.xz += (bubbleAlpha < 0.2) * normalRain.xz * _rainVisibility;
+                    normalOS.xz += normalRain.xz * _rainVisibility;
+                    // normalOS.xz += (bubbleAlpha < 0.2) * normalRain.xz * _rainVisibility;
                 }
                 // normalOS.xz *= -1;
                 float3 worldNormal = UnityObjectToWorldNormal(normalize(normalOS));
@@ -430,7 +447,7 @@
                 float4 TtoW1 = float4(worldTangent.y, worldBinormal.y, worldNormal.y, i.worldPos.y);
                 float4 TtoW2 = float4(worldTangent.z, worldBinormal.z, worldNormal.z, i.worldPos.z);
 
-                float2 normalFlow = _Time.x * float2(0.1,0.1);
+                float2 normalFlow = 0.5 * _Time.x * _OceanWaveSpeed.xy;
                 fixed4 packedNormal = tex2Dlod(_BumpMap, float4(i.uv.zw + normalFlow,0,0));
                 fixed4 packedNormal_inv = tex2Dlod(_BumpMap, float4(i.uv.zw - normalFlow,0,0));
                 fixed3 bump = fixed3(0,0,1);
@@ -469,8 +486,9 @@
                 float underWaterIntersect = smoothstep(0, _ProjectionParams.w * _OceanUnderWaterVisiableDistance, i.depth - 0);
                 // densityIntersect = isUnderWater ? underWaterIntersect : lerp(densityIntersect, densityIntersectOrg, intersect);
                 float densityIntersect = underWaterIntersect;
-                densityIntersect *= _OceanDensity;
-                intersect = step(0, diff) * intersect;
+                
+                // intersect = step(0, diff) * intersect;
+                intersect = (diff > -_ProjectionParams.w) * intersect;
                 
                 bump = normalize(half3(dot(TtoW0.xyz, bump), dot(TtoW1.xyz, bump), dot(TtoW2.xyz, bump)));
                 // bump.xz *= -1;
@@ -505,9 +523,12 @@
 				}
                 #endif
 
-                fixed4 diffColor = _OceanBaseColor * fixed4(lightCompute, 1);
+                fixed4 diffColor = lerp(_OceanSecondColor * fixed4(lightCompute, 1), _OceanBaseColor, max(1 - bubbleAlpha, densityIntersect)) ; 
+                
+                densityIntersect = lerp(saturate(_OceanDensityMin + 0.5), 1, densityIntersect);
+                densityIntersect *= _OceanDensity;
                 // return fixed4(lightCompute, 1);
-                refrCol = _OceanBaseColor.rgb * densityIntersect + (1 - densityIntersect) * refrCol;
+                refrCol = diffColor.rgb * densityIntersect + (1 - densityIntersect) * refrCol;
                 // refrCol = lerp(refrCol, diffColor.rgb, densityIntersect);
                 worldViewDir.y *= isUnderWater ? -1 : 1;
 				fixed3 worldHalfDir = normalize(worldLightDir + worldViewDir);
@@ -518,12 +539,13 @@
                 specCol *= (1 - underWaterIntersect * isUnderWater);
                 
                 // fixed4 reflCol = fixed4(1,1,1,1);
-                // reflCol = isUnderWater ? diffColor : lerp(diffColor, reflCol, _ReflactAmount);
+                // reflCol = isUnderWater ? diffColor : lerp(diffColor, reflCol, _ReflectAmount);
                 //reflCol += ssrtDiffCol * (1 - underWaterIntersect * isUnderWater);
                 // fixed3 refrReflColor = _LightColor0 * specular + reflCol.rgb * (1 - _RefractAmount) * lightCompute + refrCol * _RefractAmount;
                 fixed3 refrReflColor = specCol + refrCol.rgb;
-                bubbleAlpha = max((bubbleAlpha - 0.2) * 1.25, intersect) * tex2Dlod(_BubbleMap, float4(i.uv1.xy,0,0)).r;
-                bubbleAlpha = saturate(bubbleAlpha) * (1 - underWaterIntersect * isUnderWater);
+                bubbleAlpha = smoothstep(_BubbleStartHeight, 1, bubbleAlpha);
+                bubbleAlpha = max(bubbleAlpha, intersect) * tex2Dlod(_BubbleMap, float4(i.uv1.xy,0,0)).r;
+                bubbleAlpha = saturate(bubbleAlpha * _BubbleAlphaMulti) * (1 - underWaterIntersect * isUnderWater);
                 fixed3 bubbleColor = lightCompute;
                 // bubbleAlpha = saturate(bubbleAlpha) * (1 - underWaterIntersect * isUnderWater);
                 fixed3 finalColor = bubbleAlpha * bubbleColor + (1 - bubbleAlpha) * refrReflColor;

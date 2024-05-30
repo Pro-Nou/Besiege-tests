@@ -12,6 +12,7 @@ struct LightData
 	float angleCos;
 	float angleCrossFade;
 	float ambientAmount;
+	bool castShadow;
 };
 
 StructuredBuffer<LightData> _LightDataDataBuffer;
@@ -26,6 +27,10 @@ struct CameraMatrixs
 };
 StructuredBuffer<CameraMatrixs> _CameraMatrixs;
 
+float4 _ScreenParams;
+float _SSShadowMaxStep;
+float _SSShadowPixelBias;
+float _SSShadowPixelThickness;
 sampler2D _MainCameraOceanDepth;
 sampler2D _MainCameraOceanNormal;
 sampler2D _MainCameraSpecPre;
@@ -35,6 +40,17 @@ RWTexture2D<float4> Result;
 RWTexture2D<float4> ResultDiff;
 float _ResultResolution;
 
+inline float3 getCross(float3 pos1, float3 dir1, float3 pos2, float3 dir2)
+{
+	float a = dir1.x;
+	float b = -dir2.x;
+	float c = pos2.x - pos1.x;
+	float d = dir1.y;
+	float e = -dir2.y;
+	float f = pos2.y - pos1.y;
+	float l = (a*f - d*c)/(a*e - b*d);
+	return l * dir2 + pos2;
+}
 inline float m_DecodeFloatRG(float4 rgba)
 {
 	// float encodeFactor = 255;
@@ -65,6 +81,8 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 
 	float3 specFinal = float3(0, 0, 0);
 	float3 DiffFinal = float3 (0, 0, 0);
+
+	float ssShadowStep = 1 / _ResultResolution;
 	for (int index = 0; index < _LightCount; index++) 
 	{
 		float3 viewLightPos = mul(_CameraMatrixs[0]._MainWorldToCamera, float4(_LightDataDataBuffer[index].position, 1)).xyz;
@@ -79,6 +97,62 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 		if (angleCos < _LightDataDataBuffer[index].angleCos)
 		{
 			continue;
+		}
+		if (_LightDataDataBuffer[index].castShadow)
+		{
+			float3 viewLightVec = 2 * viewLightPos.xyz;
+			float height = viewLightVec.z / _CameraMatrixs[0]._MainCameraProjection._m11;
+			float width = _ScreenParams.x / _ScreenParams.y * height;
+			float2 scrLightPos = float2(viewLightVec.x / width, viewLightVec.y / height);
+			scrLightPos = (scrLightPos.xy + 1) / 2;
+
+			// float2 ssShadowDir = ssShadowStep * normalize(_LightDataDataBuffer[index].scrPos - uv);
+			// float maxStep = length(_LightDataDataBuffer[index].scrPos - uv) / ssShadowStep;
+
+			float2 ssShadowDir = ssShadowStep * normalize(scrLightPos - uv);
+			float maxStep = min(_SSShadowMaxStep, length(scrLightPos - uv) / ssShadowStep);
+			// float maxStepEdge = min(
+			// 	((uv.x > 0) ? (1 - uv.x) : -uv.x) / ssShadowDir.x,
+			// 	((uv.y > 0) ? (1 - uv.y) : -uv.y) / ssShadowDir.y
+			// );
+			// maxStep = min(maxStep, maxStepEdge);
+			float2 samplerPos = uv;
+			float ssShadowCount = 0;
+			bool isShadow = false;
+			float pixelBias = _SSShadowPixelBias / _SSRDistance;
+			float pixelThickness = _SSShadowPixelThickness / _SSRDistance;
+			float SSRlength1 = 9999;
+			float lastDepth = Depth;
+			while(ssShadowCount < maxStep)
+			{
+				samplerPos += ssShadowDir;
+				if (samplerPos.x < 0 || samplerPos.x > 1 || samplerPos.y < 0 || samplerPos.y > 1)
+				{
+					break;
+				}
+				float screenDepth0 = m_DecodeFloatRG(tex2Dlod(_MainCameraOceanDepth, float4(samplerPos, 0, 0)));
+
+				float2 ndcPos0 = samplerPos.xy * 2 - 1;
+				float3 clipVec0 = float3(ndcPos0.x, ndcPos0.y, -1);
+				float3 viewVec0 = mul(_CameraMatrixs[0]._MainCameraInvProjection, clipVec0.xyzz).xyz * _SSRDistance;
+				float3 viewPos1 = getCross(ViewPos, viewLightDir, float3(0, 0, 0), viewVec0);
+				SSRlength1 = length(viewPos1 - ViewPos);
+				float depth0 = length(viewPos1) / length(viewVec0);
+
+				// isShadow = depth0 >= (screenDepth0);
+				isShadow = (SSRlength1 > pixelBias && screenDepth0 - pixelBias * 0.01 < depth0 && depth0 < screenDepth0 + max(abs(lastDepth - depth0), pixelThickness));
+				bool shouldBreak = (depth0 < 0 || depth0 > 1) || isShadow;
+				if (shouldBreak)
+				{
+					break;
+				}
+				lastDepth = depth0;
+				ssShadowCount += 1;
+			}
+			if (isShadow)
+			{
+				continue;
+			}
 		}
 		float angleClamp = smoothstep(_LightDataDataBuffer[index].angleCos, 1, angleCos) + 0.01;
 		float crossFade = smoothstep(0, _LightDataDataBuffer[index].angleCrossFade, angleClamp);

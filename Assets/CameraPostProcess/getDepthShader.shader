@@ -165,6 +165,7 @@
                 SSROffset.z = sqrt(1.0 - saturate(dot(SSROffset.xy, SSROffset.xy)));
 				
                 float3 viewNormal = (tex2Dlod(_MainCameraOceanNormal, float4(i.uv.xy, 0, 0)).xyz) * 2 - 1;
+				// return float4(viewNormal, 1);
                 // float depth = DecodeFloatRG(tex2Dlod(_MainCameraOceanDepth, float4(i.uv.xy, 0, 0)).xy);
 				// if (depth >= _SSRDistance || depth <= 0)
 				// {
@@ -250,7 +251,7 @@
                 	float3 viewVec0 = mul(_MainCameraInvProjection, clipVec0.xyzz).xyz * _SSRDistance;
 					float3 viewPos1 = getCross(viewPos, reflViewDir, float3(0, 0, 0), viewVec0);
 					SSRlength1 = length(viewPos1 - viewPos);
-                	float depth0 = viewPos1 / viewVec0;
+                	float depth0 = length(viewPos1) / length(viewVec0);
                 	if (depth0 < 0 || depth0 > 1)
                 	{
                 		break;
@@ -289,6 +290,7 @@
 				// return float4((reflCol.x << 16 + reflCol.y), (reflCol.z << 16 + reflCol.w), 1, 1);
 				// return float4(SSRlength1 < pixelBias, 0, 0, 1);
 				return reflCol;
+				// return fixed4(1,0,0,1);
 				}
 			ENDCG
 		}

@@ -14,6 +14,10 @@ public class postprocessmanager : MonoBehaviour {
 	public float SSRDistance;
 	public float reflProbeDistance;
 	[Range(0f, 1f)]
+	public float SSShadowPixelBias;
+	[Range(0f, 1f)]
+	public float SSShadowPixelThickness;
+	[Range(0f, 1f)]
 	public float SSRPixelBias;
 	[Range(0f, 1f)]
 	public float SSRPixelThickness;
@@ -27,18 +31,21 @@ public class postprocessmanager : MonoBehaviour {
 	public float SSRTResDecrease;
 	[Range(0, 512)]
 	public float SSRMaxStep;
+	[Range(0, 512)]
+	public float SSShadowMaxStep;
 	public Texture2D SSRMask;
 	public float SSRMaskScale;
 
-	public struct LightData // 14 floats, 56 bytes
+	public struct LightData // 4+3+3+1+1+1+1+1 = 15 floats, 15 * 4 = 68 bytes
 	{
-		public Color lightColor;
-		public Vector3 position;
-		public Vector3 forward;
-		public float distance;
-		public float angleCos;
-		public float angleCrossFade;
-		public float ambientAmount;
+		public Color lightColor; // 4
+		public Vector3 position; // 3
+		public Vector3 forward; // 3
+		public float distance; // 1
+		public float angleCos; // 1
+		public float angleCrossFade; // 1
+		public float ambientAmount; // 1
+		public bool castShadow; // 1
 	}
 	public List<int> lightDataKeys;
 	public Dictionary<int, LightData> lightDatas;
@@ -60,8 +67,10 @@ public class postprocessmanager : MonoBehaviour {
 	public cloudMove cloudmove;
 	public float oceanHeight;
 	public float oceanDensity;
+	public float oceanDensityMin;
 	public float oceanUnderWaterVisiableDistance;
 	public Color oceanBaseColor;
+	public Color oceanSecondColor;
 	public Texture2D oceanHeightMap;
 	public Vector2 oceanHeightMapScale;
 	public float oceanHeightScale;
@@ -69,6 +78,12 @@ public class postprocessmanager : MonoBehaviour {
 	public Vector2 oceanWaveCullMapScale;
 	public float oceanWaveCullScale;
 	public Vector4 oceanWaveSpeed;
+	public Texture2D oceanBumpMap;
+	public float oceanBumpScale;
+	public float oceanReflectAmount;
+	public float bubbleStartHeight;
+	public float bubbleAlphaMulti;
+
 	[Range(0, 1)]
 	public float rainVisibility;
 	[Range(0, 1)]
@@ -125,7 +140,7 @@ public class postprocessmanager : MonoBehaviour {
 		lightDataKeys = new List<int> ();
 
 		//lightDatas = new List<LightData> ();
-		lightBuffer = new ComputeBuffer(256, 56);//256 lights, 56bytes per light
+		lightBuffer = new ComputeBuffer(256, 60);//256 lights, 60bytes per light
 		cameraMatrixArray = new cameraMatrixs[1];
 		cameraMatrixBuffer = new ComputeBuffer (1, 256);
 	} 
@@ -180,6 +195,7 @@ public class postprocessmanager : MonoBehaviour {
 		resizeRT (ref ssrtSpecFinal, new Vector2(1024f / ssrtResDec, 1024f / ssrtResDec));
 		resizeRT (ref ssrtDiffFinal, new Vector2(1024f / ssrtResDec, 1024f / ssrtResDec));
 		ssrtCompute.SetFloat("_ResultResolution", 1024f / ssrtResDec);
+		ssrtCompute.SetVector("_ScreenParams", new Vector4(Screen.width, Screen.height, 1, 1));
 
 		RenderBuffer[] rb = new RenderBuffer[3];
 		rb [0] = ssrDepthCache.colorBuffer;
@@ -221,7 +237,11 @@ public class postprocessmanager : MonoBehaviour {
 
 		Shader.SetGlobalFloat ("_OceanHeight", oceanHeight);
 		Shader.SetGlobalFloat ("_OceanDensity", oceanDensity);
+		Shader.SetGlobalFloat ("_OceanDensityMin", oceanDensityMin);
 		Shader.SetGlobalFloat ("_OceanUnderWaterVisiableDistance", oceanUnderWaterVisiableDistance);
+		Shader.SetGlobalFloat ("_BubbleStartHeight", bubbleStartHeight);
+		Shader.SetGlobalFloat ("_BubbleAlphaMulti", bubbleAlphaMulti);
+
 		Shader.SetGlobalFloat ("_rainVisibility", rainVisibility);
 		Shader.SetGlobalFloat ("_AfterRainAmount", afterRainAmount);
 		Shader.SetGlobalTexture("_RainMap", rainMap);
@@ -246,6 +266,7 @@ public class postprocessmanager : MonoBehaviour {
 
 		Material oceanMat = oceanObject.GetComponent<MeshRenderer> ().materials [1];
 		oceanMat.SetColor("_OceanBaseColor", oceanBaseColor);
+		oceanMat.SetColor("_OceanSecondColor", oceanSecondColor);
 		oceanMat.SetTexture("_OceanHeightMap", oceanHeightMap);
 		oceanMat.SetTextureScale("_OceanHeightMap", oceanHeightMapScale);
 		oceanMat.SetFloat ("_OceanHeightScale", oceanHeightScale);
@@ -253,6 +274,9 @@ public class postprocessmanager : MonoBehaviour {
 		oceanMat.SetTextureScale("_OceanWaveCullMap", oceanWaveCullMapScale);
 		oceanMat.SetFloat ("_OceanWaveCullScale", oceanWaveCullScale);
 		oceanMat.SetVector ("_OceanWaveSpeed", oceanWaveSpeed);
+		oceanMat.SetTexture ("_BumpMap", oceanBumpMap);
+		oceanMat.SetFloat ("_BumpScale", oceanBumpScale);
+		oceanMat.SetFloat ("_ReflectAmount", oceanReflectAmount);
 		oceanObject.GetComponent<MeshRenderer> ().materials [0].CopyPropertiesFromMaterial (oceanMat);
 		oceanObject.transform.GetChild (0).gameObject.GetComponent<MeshRenderer> ().material.CopyPropertiesFromMaterial (oceanMat);
 		cloudmove.oceanHeightFix (oceanHeight);
@@ -286,6 +310,9 @@ public class postprocessmanager : MonoBehaviour {
 		ssrtCompute.SetTexture(ssrtComputeId, "_MainCameraOceanDepth", ssrDepthCache);
 		ssrtCompute.SetTexture(ssrtComputeId, "_MainCameraOceanNormal", ssrNormalCache);
 		ssrtCompute.SetTexture(ssrtComputeId, "_MainCameraSpecPre", ssrtSpecPre);
+		ssrtCompute.SetFloat("_SSShadowMaxStep", SSShadowMaxStep);
+		ssrtCompute.SetFloat("_SSShadowPixelBias", SSShadowPixelBias);
+		ssrtCompute.SetFloat("_SSShadowPixelThickness", SSShadowPixelThickness);
 		ssrtCompute.SetFloat("_SSRDistance", SSRDistance);
 		ssrtCompute.SetFloat("_OceanHeight", oceanHeight);
 	}
@@ -355,6 +382,7 @@ public class postprocessmanager : MonoBehaviour {
 		beforeAlpha.Blit (rt, rt1);
 		//beforeAlpha.Blit (rt1, rt3, blitMat, 1);
 		mainCamera.AddCommandBuffer (CameraEvent.AfterForwardAlpha, beforeAlpha);
+		// mainCamera.AddCommandBuffer (CameraEvent.BeforeForwardAlpha, beforeAlpha);
 
 		instance = this;
 		//mainCamera.AddCommandBuffer (CameraEvent.BeforeGBuffer, beforeGbuffer);
@@ -369,6 +397,7 @@ public class postprocessmanager : MonoBehaviour {
 
 
 		Graphics.Blit (rgbaResult, rgbaFinal, blitMat, 2);
+		// Graphics.Blit (rgbaResult, rgbaFinal);
 		blitMat.SetMatrix ("_MainWorldToCamera", mainCamera.transform.worldToLocalMatrix);
 		if (SSREnable) {
 			UpdateSSRT ();
@@ -416,12 +445,12 @@ public class postprocessmanager : MonoBehaviour {
 
 		PreRenderUpdate ();
 	}
-	void LateUpdate()
-	{
-		//ssrCamera.Render ();
+	// void LateUpdate()
+	// {
+	// 	//ssrCamera.Render ();
 
-		//UpdateCamera();
-	}
+	// 	//UpdateCamera();
+	// }
 	void OnPreRender()
 	{
 		oceanDepthNormalCamera.Render ();
